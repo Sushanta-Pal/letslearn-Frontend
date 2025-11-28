@@ -11,11 +11,13 @@ import CourseCard from "../components/CourseCard";
 import Testimonial from "../components/ui/Testimonial";
 import FeatureSection from "../components/ui/FeatureSection";
 import MobileNav from "@/components/ui/MobileNav";
+import { courses as courseMap } from "../data/Course";
 
 export default function FoxBirdLanding() {
   const [courses, setCourses] = useState([
     {
       id: 1,
+      slug: "modern-react-with-hooks",
       title: "Modern React with Hooks",
       description:
         "Go from beginner to advanced in React.js by building real-world applications. Master hooks, context, and Redux.",
@@ -28,6 +30,7 @@ export default function FoxBirdLanding() {
     },
     {
       id: 2,
+      slug: "advanced-tailwind-css",
       title: "Advanced Tailwind CSS",
       description:
         "Master the utility-first CSS framework. Learn advanced techniques, customization, and how to build complex responsive layouts.",
@@ -40,6 +43,7 @@ export default function FoxBirdLanding() {
     },
     {
       id: 3,
+      slug: "complete-nodejs-developer",
       title: "Complete Node.js Developer",
       description:
         "Learn Node.js from scratch. Build, test, and deploy real-time applications with Express, MongoDB, and more.",
@@ -52,6 +56,7 @@ export default function FoxBirdLanding() {
     },
     {
       id: 4,
+      slug: "data-structures-and-algorithms",
       title: "Data Structures & Algorithms",
       description:
         "Ace your coding interviews. A deep dive into fundamental data structures and algorithms with practical examples.",
@@ -64,6 +69,7 @@ export default function FoxBirdLanding() {
     },
     {
       id: 5,
+      slug: "python-django-fullstack-web",
       title: "Python & Django Full Stack Web",
       description:
         "Build and deploy powerful web applications with Python, Django, and a RESTful API. Includes databases and authentication.",
@@ -76,6 +82,7 @@ export default function FoxBirdLanding() {
     },
     {
       id: 6,
+      slug: "ui-ux-design-fundamentals",
       title: "UI/UX Design Fundamentals",
       description:
         "Learn the principles of user interface and user experience design. Master Figma, wireframing, and prototyping.",
@@ -513,13 +520,31 @@ export default function FoxBirdLanding() {
         <section id="courses" className="py-14 bg-[#0F0F10]">
           <div className="max-w-[1200px] mx-auto px-6">
             <h2 className="text-2xl font-bold">Explore Our Courses</h2>
+
             <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {courses.map((course) => (
-                <CourseCard key={course.id} course={course} />
+              {Object.entries(courseMap).map(([slug, data], index) => (
+                <CourseCard
+                  key={slug}
+                  course={{
+                    // routing
+                    slug,
+                    id: index + 1,
+
+                    // content
+                    title: data.title,
+                    description: data.description,
+                    level: data.level,
+                    duration: data.duration,
+                    rating: data.rating,
+                    imageUrl: data.banner, // reuse banner as card image
+                    isTrending: index === 0, // or add a flag in data if you want
+                  }}
+                />
               ))}
             </div>
           </div>
         </section>
+
         {/* PRICING */}
         <section id="pricing" className="py-14 bg-[#0F0F10]">
           <div className="flex flex-wrap gap-8 justify-center mt-20">
