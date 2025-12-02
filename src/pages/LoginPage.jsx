@@ -64,7 +64,7 @@ const handleLogin = async (e) => {
         // 4. LOG THE JWT (This is the token Motia needs to validate!)
         console.log("✅ Supabase Sign In Successful. User ID:", userId);
         console.log("--- JWT Access Token for Motia ---");
-        console.log(jwtToken);
+        // console.log(jwtToken);
         console.log("------------------------------------");
 
 
