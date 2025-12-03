@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { supabase } from "../supabaseClient.js"; // Ensure .js extension is present
+import { supabase } from "../supabaseClient.js";
 import { useNavigate } from "react-router-dom";
 import {
   LogOut,
@@ -41,7 +41,6 @@ export default function ProfilePage() {
         }
 
         setUser(user);
-        // Fetch role from metadata, default to student if missing
         setRole(user.user_metadata?.role || "student");
       } catch (error) {
         console.error("Error fetching user:", error);
@@ -110,7 +109,7 @@ export default function ProfilePage() {
             <SidebarItem
               icon={Home}
               label="Home"
-              active={false} // Home doesn't take 'active' state in this dashboard view context
+              active={false}
               onClick={() => navigate("/")}
             />
 
@@ -186,8 +185,12 @@ export default function ProfilePage() {
               .
             </p>
           </div>
+
           {role === "creator" && activeTab === "courses" && (
-            <button className="bg-[#FF4A1F] text-black px-5 py-2.5 rounded-full font-bold flex items-center justify-center gap-2 hover:brightness-110 hover:scale-105 transition-all shadow-lg shadow-orange-500/20">
+            <button
+              onClick={() => navigate("/courses-upload")}
+              className="bg-[#FF4A1F] text-black px-5 py-2.5 rounded-full font-bold flex items-center justify-center gap-2 hover:brightness-110 hover:scale-105 transition-all shadow-lg shadow-orange-500/20"
+            >
               <PlusCircle size={18} />
               Create New Course
             </button>
@@ -204,7 +207,10 @@ export default function ProfilePage() {
             transition={{ duration: 0.2 }}
           >
             {role === "creator" ? (
-              <CreatorView activeTab={activeTab} />
+              <CreatorView
+                activeTab={activeTab}
+                onCreateCourse={() => navigate("/courses-upload")}
+              />
             ) : (
               <StudentView activeTab={activeTab} />
             )}
@@ -246,7 +252,7 @@ function SidebarItem({ icon: Icon, label, active, onClick }) {
 }
 
 /* --- CREATOR VIEW --- */
-function CreatorView({ activeTab }) {
+function CreatorView({ activeTab, onCreateCourse }) {
   if (activeTab === "overview") {
     return (
       <div className="space-y-8">
@@ -305,7 +311,7 @@ function CreatorView({ activeTab }) {
         />
         <div
           className="group border border-dashed border-gray-700 rounded-2xl flex flex-col items-center justify-center p-6 text-gray-500 hover:border-[#FF4A1F] hover:text-[#FF4A1F] hover:bg-[#FF4A1F]/5 cursor-pointer transition-all min-h-[250px]"
-          onClick={() => alert("Open create course modal")}
+          onClick={onCreateCourse}
         >
           <div className="p-4 rounded-full bg-gray-800 group-hover:bg-[#FF4A1F]/20 mb-4 transition-colors">
             <PlusCircle size={32} />

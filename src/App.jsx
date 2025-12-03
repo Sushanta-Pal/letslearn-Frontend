@@ -1,101 +1,97 @@
+// src/App.jsx
 import React from "react";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
+
 import LoginPage from "./pages/LoginPage";
 import SignUpPage from "./pages/SignUpPage";
 import Dashboard from "./pages/Dashboard";
 import CoursePage from "./pages/CoursePage";
-
-// Add this configuration block to your main application entry point (e.g., _app.js)
-
-// main.jsx or index.jsx (Your App Root File)
-
-import { Amplify } from "aws-amplify"; // <-- Simple import from top-level package
 import ProfilePage from "./pages/ProfilePage";
+import CourseUploadPage from "./pages/CourseUploadPage"; // ⬅️ NEW
 
-// 1. Configuration Block (Must execute first)
+// AWS Amplify
+import { Amplify } from "aws-amplify";
+
 Amplify.configure({
   Auth: {
-    // V6 REQUIRES the nested 'Cognito' object
     Cognito: {
       userPoolId: import.meta.env.VITE_COGNITO_USER_POOL_ID,
-
-      // Property name changed from userPoolWebClientId to userPoolClientId
       userPoolClientId: import.meta.env.VITE_COGNITO_CLIENT_ID,
-
       region: import.meta.env.VITE_AWS_REGION,
-      // Note: identityPoolId is optional, omitted for simplicity here
     },
   },
 });
-// ... rest of the file ...
+
+const pageMotionProps = {
+  initial: { opacity: 0, y: 10 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -10 },
+  transition: { duration: 0.35 },
+};
+
 function AnimatedRoutes() {
   const location = useLocation();
+
   return (
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
+        {/* Landing / Dashboard */}
         <Route
           path="/"
           element={
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.35 }}
-            >
+            <motion.div {...pageMotionProps}>
               <Dashboard />
             </motion.div>
           }
         />
+
+        {/* Signup */}
         <Route
           path="/signup"
           element={
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.35 }}
-            >
+            <motion.div {...pageMotionProps}>
               <SignUpPage />
             </motion.div>
           }
         />
+
+        {/* Login */}
         <Route
           path="/login"
           element={
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.35 }}
-            >
+            <motion.div {...pageMotionProps}>
               <LoginPage />
             </motion.div>
           }
         />
+
+        {/* Course Detail */}
         <Route
           path="/course/:slug"
           element={
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.35 }}
-            >
+            <motion.div {...pageMotionProps}>
               <CoursePage />
             </motion.div>
           }
         />
+
+        {/* Profile */}
         <Route
           path="/profile"
           element={
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.35 }}
-            >
+            <motion.div {...pageMotionProps}>
               <ProfilePage />
+            </motion.div>
+          }
+        />
+
+        {/* ⬇️ NEW: Creator Course Upload Page */}
+        <Route
+          path="/courses-upload"
+          element={
+            <motion.div {...pageMotionProps}>
+              <CourseUploadPage />
             </motion.div>
           }
         />
