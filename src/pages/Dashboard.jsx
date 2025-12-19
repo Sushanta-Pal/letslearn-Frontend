@@ -103,15 +103,7 @@ export default function FoxBirdLanding() {
 
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [loading, setLoading] = useState(true);
-  const extractRole = (session) => {
-    if (!session || !session.user) return null;
-    // Checks app_metadata first (for production) then user_metadata (for local testing)
-    return (
-      session.user.app_metadata?.user_role || 
-      session.user.user_metadata?.user_role || 
-      'Student'
-    );
-  };
+
   // --- EFFECTS ---
   useEffect(() => {
     // 1. Check active session on mount
