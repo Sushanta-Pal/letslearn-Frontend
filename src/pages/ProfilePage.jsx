@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "../supabaseClient.js";
 import { useNavigate } from "react-router-dom";
 import MockInterviewView from "./MockInterviewView.jsx";
+import CoursesList from "./CoursesList.jsx"; // Ensure file exists
+import ManageCourses from "./ManageCourses.jsx"; // Ensure file exists
 import {
   LogOut, User, BookOpen, Award, Settings, PlusCircle,
   BarChart2, Users, DollarSign, PlayCircle, CheckCircle,
@@ -45,17 +47,18 @@ export default function ProfilePage({ defaultTab = "overview" }) {
       </div>
     );
   }
-const userInitial = (user?.user_metadata?.fullName || user?.email || "U").charAt(0).toUpperCase();
-const displayUserName = user?.user_metadata?.fullName || user?.email?.split("@")[0];
+  
+  const userInitial = (user?.user_metadata?.fullName || user?.email || "U").charAt(0).toUpperCase();
+  const displayUserName = user?.user_metadata?.fullName || user?.email?.split("@")[0];
+
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-white flex flex-col md:flex-row font-sans">
       {/* MOBILE HEADER */}
       <div className="md:hidden flex items-center justify-between p-4 border-b border-gray-800 bg-[#111]">
         <div className="flex items-center gap-3">
-          {/* Replace {user?.email?.charAt(0).toUpperCase()} with: */}
-      <div className="w-8 h-8 rounded-full bg-[#FF4A1F] flex items-center justify-center font-bold text-black text-sm">
-  {userInitial}
-        </div>
+          <div className="w-8 h-8 rounded-full bg-[#FF4A1F] flex items-center justify-center font-bold text-black text-sm">
+             {userInitial}
+          </div>
           <span className="font-semibold">My Dashboard</span>
         </div>
         <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
@@ -90,15 +93,17 @@ const displayUserName = user?.user_metadata?.fullName || user?.email?.split("@")
 
             {role === "student" ? (
               <>
-                {/* Student specific order */}
+                <SidebarItem icon={BookOpen} label="My Courses" active={activeTab === "courses"} onClick={() => { setActiveTab("courses"); setMobileMenuOpen(false); }} />
+                <SidebarItem icon={Mic} label="Mock Interview" active={activeTab === "mock-interview"} onClick={() => { setActiveTab("mock-interview"); setMobileMenuOpen(false); }} />
                 <SidebarItem icon={Award} label="Achievements" active={activeTab === "achievements"} onClick={() => { setActiveTab("achievements"); setMobileMenuOpen(false); }} />
                 <SidebarItem icon={ClipboardList} label="Assignments" active={activeTab === "assignments"} onClick={() => { setActiveTab("assignments"); setMobileMenuOpen(false); }} />
-                <SidebarItem icon={Mic} label="Mock Interview" active={activeTab === "mock-interview"} onClick={() => { setActiveTab("mock-interview"); setMobileMenuOpen(false); }} />
-                <SidebarItem icon={BookOpen} label="Courses" active={activeTab === "courses"} onClick={() => { setActiveTab("courses"); setMobileMenuOpen(false); }} />
               </>
             ) : (
               /* Creator specific */
-              <SidebarItem icon={BookOpen} label="Manage Courses" active={activeTab === "courses"} onClick={() => { setActiveTab("courses"); setMobileMenuOpen(false); }} />
+              <>
+                 <SidebarItem icon={BookOpen} label="Manage Content" active={activeTab === "manage-content"} onClick={() => { setActiveTab("manage-content"); setMobileMenuOpen(false); }} />
+                 <SidebarItem icon={PlusCircle} label="Create Course" active={activeTab === "create-course"} onClick={() => navigate("/courses-upload")} />
+              </>
             )}
 
             <SidebarItem icon={Settings} label="Settings" active={activeTab === "settings"} onClick={() => { setActiveTab("settings"); setMobileMenuOpen(false); }} />
@@ -121,9 +126,9 @@ const displayUserName = user?.user_metadata?.fullName || user?.email?.split("@")
         <AnimatePresence mode="wait">
           <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}>
             {role === "creator" ? (
-              <CreatorView activeTab={activeTab} onCreateCourse={() => navigate("/courses-upload")} />
+              <CreatorView activeTab={activeTab} />
             ) : (
-              <StudentView activeTab={activeTab}  user={user}/>
+              <StudentView activeTab={activeTab} user={user} />
             )}
           </motion.div>
         </AnimatePresence>
@@ -132,9 +137,7 @@ const displayUserName = user?.user_metadata?.fullName || user?.email?.split("@")
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/* SUB-COMPONENTS - THESE MUST BE IN THE SAME FILE OR IMPORTED                */
-/* -------------------------------------------------------------------------- */
+/* ---------------- SUB-COMPONENTS ---------------- */
 
 function SidebarItem({ icon: Icon, label, active, onClick }) {
   return (
@@ -150,7 +153,7 @@ function SidebarItem({ icon: Icon, label, active, onClick }) {
   );
 }
 
-function StudentView({ activeTab , user }) {
+function StudentView({ activeTab, user }) {
   if (activeTab === "overview") {
     return (
       <div className="space-y-8">
@@ -165,6 +168,9 @@ function StudentView({ activeTab , user }) {
     );
   }
 
+  if (activeTab === "courses") return <CoursesList />;
+  if (activeTab === "mock-interview") return <MockInterviewView user={user} />;
+  
   if (activeTab === "achievements") {
     return (
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -175,29 +181,10 @@ function StudentView({ activeTab , user }) {
     );
   }
 
-  if (activeTab === "assignments") {
-    return <PlaceholderSection title="Assignments" icon={ClipboardList} />;
-  }
-
-  if (activeTab === "mock-interview") {
-    return <MockInterviewView user={user} />;
-  }
-
-  if (activeTab === "courses") {
-    return (
-      <div className="space-y-8">
-        <h2 className="text-2xl font-bold">Your Learning Path</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <CourseProgressCard title="Modern React" progress={65} lastAccessed="2 hours ago" image="https://images.unsplash.com/photo-1633356122102-3fe601e05bd2?auto=format&fit=crop&w=500&q=60" large />
-        </div>
-      </div>
-    );
-  }
-
-  return <PlaceholderSection title={activeTab} icon={Settings} />;
+  return <PlaceholderSection title={activeTab} icon={ClipboardList} />;
 }
 
-function CreatorView({ activeTab, onCreateCourse }) {
+function CreatorView({ activeTab }) {
   if (activeTab === "overview") {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
@@ -207,10 +194,16 @@ function CreatorView({ activeTab, onCreateCourse }) {
       </div>
     );
   }
+  
+  // This renders the new Teacher Component
+  if (activeTab === "manage-content") {
+    return <ManageCourses />;
+  }
+
   return <PlaceholderSection title={activeTab} icon={BookOpen} />;
 }
 
-/* HELPER COMPONENTS FOR UI */
+/* HELPER COMPONENTS */
 function StatCard({ icon: Icon, title, value, trend }) {
   return (
     <div className="bg-[#111] p-6 rounded-2xl border border-gray-800">
@@ -234,26 +227,12 @@ function AchievementCard({ title, icon, unlocked }) {
   );
 }
 
-function CourseProgressCard({ title, progress, lastAccessed, image, large }) {
-  return (
-    <div className={`bg-[#111] rounded-2xl p-4 flex gap-4 border border-gray-800 items-center`}>
-      <img src={image} alt={title} className="w-16 h-16 rounded-xl object-cover" />
-      <div className="flex-1">
-        <h4 className="font-bold">{title}</h4>
-        <div className="w-full bg-gray-800 h-1.5 rounded-full mt-2">
-          <div className="bg-[#FF4A1F] h-full rounded-full" style={{ width: `${progress}%` }} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function PlaceholderSection({ title, icon: Icon }) {
   return (
     <div className="flex flex-col items-center justify-center h-96 text-gray-500 border border-dashed border-gray-800 rounded-2xl bg-[#111]/50">
       <Icon size={48} className="mb-4 opacity-50" />
       <h3 className="text-lg font-semibold capitalize">{title} Content Coming Soon</h3>
-      <p className="text-sm mt-2 max-w-xs text-center opacity-70">We're working on building the {title} module for your dashboard.</p>
+      <p className="text-sm mt-2 max-w-xs text-center opacity-70">We're working on building the {title} module.</p>
     </div>
   );
 }

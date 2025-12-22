@@ -32,7 +32,9 @@ export default function SignUpPage() {
     setLoading(true);
 
     try {
-      const userRole = role === "creator" ? "Teacher" : "Student";
+      // LOGIC: Students are auto-verified, Creators are NOT.
+      const isCreator = role === "creator";
+      const isVerified = !isCreator; 
 
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -41,7 +43,8 @@ export default function SignUpPage() {
           emailRedirectTo: `${window.location.origin}/login`,
           data: {
             full_name: fullName,
-            user_role: userRole,
+            role: role,
+            verified: isVerified, // <--- NEW FIELD
           },
         },
       });
@@ -49,7 +52,9 @@ export default function SignUpPage() {
       if (error) throw error;
 
       alert(
-        "Signup successful! Please check your email and confirm your account before logging in."
+        isCreator 
+          ? "Signup successful! Your Creator account is pending Admin Approval."
+          : "Signup successful! Please check your email to confirm."
       );
 
       navigate("/login");
@@ -61,13 +66,13 @@ export default function SignUpPage() {
     }
   };
 
+  // ... (Rest of the JSX remains exactly the same as your previous version)
   return (
     <div className="min-h-screen w-full bg-[#060606] text-white flex relative overflow-hidden">
-      {/* LEFT PANEL */}
+      {/* ... Left Panel ... */}
       <div className="hidden lg:flex flex-col justify-between p-14 w-2/5">
         <div>
           <h1 className="text-xl font-bold">Fox Bird</h1>
-
           <h2 className="mt-14 text-4xl font-extrabold">
             Welcome to the future of
             <div className="text-6xl mt-2">
@@ -78,18 +83,16 @@ export default function SignUpPage() {
               />
             </div>
           </h2>
-
           <p className="mt-6 text-gray-400 max-w-md">
             Learn, build, and grow with real-world projects and guided learning.
           </p>
         </div>
-
         <p className="text-sm text-gray-600">
           © 2025 Fox Bird — All rights reserved.
         </p>
       </div>
 
-      {/* RIGHT PANEL */}
+      {/* ... Right Panel ... */}
       <div className="w-full lg:w-3/5 flex items-center justify-center p-10">
         <div className="w-full max-w-md bg-[#0C0C0C] border border-gray-800 rounded-2xl p-8">
           <h2 className="text-3xl font-bold">Create your account</h2>
@@ -147,38 +150,20 @@ export default function SignUpPage() {
           </form>
 
           <Divider />
-
-          {/* OAuth */}
-          <OAuthButton
-            label="Continue with Google"
-            icon="https://www.svgrepo.com/show/475656/google-color.svg"
-            provider="google"
-          />
-
-          <OAuthButton
-            label="Continue with GitHub"
-            icon="https://www.svgrepo.com/show/343674/github.svg"
-            provider="github"
-          />
+          <OAuthButton label="Continue with Google" icon="https://www.svgrepo.com/show/475656/google-color.svg" provider="google" />
+          <OAuthButton label="Continue with GitHub" icon="https://www.svgrepo.com/show/343674/github.svg" provider="github" />
         </div>
       </div>
     </div>
   );
 }
 
-/* ---------------- COMPONENTS ---------------- */
-
+/* ---------------- COMPONENTS (Keep existing) ---------------- */
 function Input({ label, type = "text", placeholder, onChange }) {
   return (
     <div className="flex flex-col gap-1.5">
       <label className="text-sm text-gray-300">{label}</label>
-      <input
-        type={type}
-        placeholder={placeholder}
-        onChange={onChange}
-        required
-        className="px-4 py-2 bg-[#0A0A0A] border border-gray-700 rounded-lg"
-      />
+      <input type={type} placeholder={placeholder} onChange={onChange} required className="px-4 py-2 bg-[#0A0A0A] border border-gray-700 rounded-lg" />
     </div>
   );
 }
@@ -194,14 +179,8 @@ function Divider() {
 }
 
 function PasswordStrengthIndicator({ strength }) {
-  const map = {
-    weak: "bg-red-500",
-    medium: "bg-yellow-500",
-    strong: "bg-green-500",
-  };
-
+  const map = { weak: "bg-red-500", medium: "bg-yellow-500", strong: "bg-green-500" };
   if (!map[strength]) return null;
-
   return (
     <div className="mt-2 flex items-center gap-2 text-sm">
       <div className={`w-20 h-1 rounded ${map[strength]}`} />
@@ -211,15 +190,9 @@ function PasswordStrengthIndicator({ strength }) {
 }
 
 function OAuthButton({ label, icon, provider }) {
-  const handleOAuth = async () => {
-    await supabase.auth.signInWithOAuth({ provider });
-  };
-
+  const handleOAuth = async () => { await supabase.auth.signInWithOAuth({ provider }); };
   return (
-    <button
-      onClick={handleOAuth}
-      className="w-full flex items-center justify-center gap-3 py-3 mt-3 bg-[#111] border border-gray-800 rounded-xl"
-    >
+    <button onClick={handleOAuth} className="w-full flex items-center justify-center gap-3 py-3 mt-3 bg-[#111] border border-gray-800 rounded-xl">
       <img src={icon} className="w-5 h-5" alt={provider} />
       {label}
     </button>

@@ -10,6 +10,7 @@ import ProfilePage from "./pages/ProfilePage";
 import CourseUploadPage from "./pages/CourseUploadPage";
 import AddQuestionPage from "./pages/AddQuestionPage"; 
 import QuestionListPage from "./pages/QuestionList"; 
+import CourseViewer from "./pages/CourseViewer";
 
 const pageMotionProps = {
   initial: { opacity: 0, y: 10 },
@@ -35,7 +36,7 @@ function AnimatedRoutes() {
         <Route path="/student/mock-interview" element={<motion.div {...pageMotionProps}><ProfilePage defaultTab="mock-interview" /></motion.div>} />
         <Route path="/student/courses" element={<motion.div {...pageMotionProps}><ProfilePage defaultTab="courses" /></motion.div>} />
         <Route path="/student/questions" element={<motion.div {...pageMotionProps}><QuestionListPage /></motion.div>} />
-
+        <Route path="/student/course/:courseId" element={<CourseViewer />} />
         {/* Teacher Routes */}
         <Route path="/courses-upload" element={<motion.div {...pageMotionProps}><CourseUploadPage /></motion.div>} />
         <Route path="/teacher/add-question" element={<motion.div {...pageMotionProps}><AddQuestionPage /></motion.div>} />
