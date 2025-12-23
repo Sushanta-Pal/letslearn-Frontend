@@ -2,16 +2,22 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "../supabaseClient.js";
 import { useNavigate } from "react-router-dom";
+
+// --- EXISTING COMPONENTS ---
 import MockInterviewView from "./MockInterviewView.jsx";
 import CoursesList from "./CoursesList.jsx"; 
 import ManageCourses from "./ManageCourses.jsx"; 
 import PracticeSetBuilder from "./PracticeSetBuilder.jsx"; 
 
+// --- NEW ASSIGNMENT COMPONENTS ---
+import AssignmentManager from "./AssignmentManager.jsx"; 
+import StudentAssignmentView from "./StudentAssignmentView.jsx";
+
 import {
   LogOut, User, BookOpen, Award, Settings, PlusCircle,
-  BarChart2, Users, DollarSign, PlayCircle, CheckCircle,
+  BarChart2, Users, DollarSign, CheckCircle,
   Clock, Home, Menu, X, ClipboardList, Mic, Layers, 
-  Code, TrendingUp, Calendar
+  Code, TrendingUp, FileText // <--- Added FileText for Assignments
 } from "lucide-react";
 
 export default function ProfilePage({ defaultTab = "overview" }) {
@@ -41,7 +47,6 @@ export default function ProfilePage({ defaultTab = "overview" }) {
           setProfileData(profile);
           setRole(profile.role || "student");
         } else {
-          // Fallback if profile doesn't exist yet
           setRole(user.user_metadata?.role || "student");
         }
 
@@ -112,6 +117,10 @@ export default function ProfilePage({ defaultTab = "overview" }) {
             {role === "student" ? (
               <>
                 <SidebarItem icon={BookOpen} label="My Courses" active={activeTab === "courses"} onClick={() => { setActiveTab("courses"); setMobileMenuOpen(false); }} />
+                
+                {/* --- STUDENT ASSIGNMENT TAB --- */}
+                <SidebarItem icon={FileText} label="Assignments" active={activeTab === "assignments"} onClick={() => { setActiveTab("assignments"); setMobileMenuOpen(false); }} />
+                
                 <SidebarItem icon={Mic} label="Mock Interview" active={activeTab === "mock-interview"} onClick={() => { setActiveTab("mock-interview"); setMobileMenuOpen(false); }} />
                 <SidebarItem icon={Code} label="Practice Arena" active={false} onClick={() => navigate("/student/questions")} />
                 <SidebarItem icon={Award} label="Achievements" active={activeTab === "achievements"} onClick={() => { setActiveTab("achievements"); setMobileMenuOpen(false); }} />
@@ -119,6 +128,10 @@ export default function ProfilePage({ defaultTab = "overview" }) {
             ) : (
               <>
                  <SidebarItem icon={BookOpen} label="Manage Content" active={activeTab === "manage-content"} onClick={() => { setActiveTab("manage-content"); setMobileMenuOpen(false); }} />
+                 
+                 {/* --- TEACHER ASSIGNMENT TAB --- */}
+                 <SidebarItem icon={FileText} label="Assignments" active={activeTab === "assignments"} onClick={() => { setActiveTab("assignments"); setMobileMenuOpen(false); }} />
+                 
                  <SidebarItem icon={Layers} label="Practice Sets" active={activeTab === "practice-sets"} onClick={() => { setActiveTab("practice-sets"); setMobileMenuOpen(false); }} />
                  <SidebarItem icon={PlusCircle} label="Create Course" active={activeTab === "create-course"} onClick={() => navigate("/courses-upload")} />
                  <SidebarItem icon={Code} label="Add Coding Qs" active={false} onClick={() => navigate("/teacher/add-question")} />
@@ -172,16 +185,14 @@ function SidebarItem({ icon: Icon, label, active, onClick }) {
   );
 }
 
-// --- UPDATED STUDENT VIEW ---
+// --- STUDENT VIEW ---
 function StudentView({ activeTab, user, profile }) {
   const [history, setHistory] = useState([]);
   const [loadingHist, setLoadingHist] = useState(true);
 
-  // Fetch Submission History specifically for the "overview" tab
   useEffect(() => {
     if (activeTab === 'overview' && user) {
       const fetchHistory = async () => {
-        // Fetch solutions joined with question title
         const { data, error } = await supabase
           .from('student_solutions')
           .select(`
@@ -190,7 +201,7 @@ function StudentView({ activeTab, user, profile }) {
           `)
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
-          .limit(5); // Last 5 activities
+          .limit(5);
 
         if (!error && data) setHistory(data);
         setLoadingHist(false);
@@ -202,11 +213,7 @@ function StudentView({ activeTab, user, profile }) {
   if (activeTab === "overview") {
     return (
       <div className="space-y-8">
-        
-        {/* 1. Wallet & Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          
-          {/* Wallet Card */}
           <div className="bg-gradient-to-br from-yellow-900/40 to-black border border-yellow-700/30 p-6 rounded-2xl relative overflow-hidden shadow-lg group">
              <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                <DollarSign size={100} />
@@ -217,27 +224,10 @@ function StudentView({ activeTab, user, profile }) {
              </div>
              <p className="text-gray-400 text-xs mt-2">Earn more by solving challenges!</p>
           </div>
-
-          {/* Solved Count */}
-          <StatCard 
-            icon={CheckCircle} 
-            title="Problems Solved" 
-            value={history.length} // Just a placeholder, ideally fetch 'count' from DB
-            trend="+2 this week"
-            color="green"
-          />
-
-          {/* Rank */}
-          <StatCard 
-            icon={TrendingUp} 
-            title="Global Rank" 
-            value="#42" 
-            trend="Top 5%"
-            color="blue"
-          />
+          <StatCard icon={CheckCircle} title="Problems Solved" value={history.length} trend="+2 this week" color="green" />
+          <StatCard icon={TrendingUp} title="Global Rank" value="#42" trend="Top 5%" color="blue" />
         </div>
 
-        {/* 2. Recent Activity History */}
         <div className="bg-[#111] border border-gray-800 rounded-2xl overflow-hidden">
            <div className="p-6 border-b border-gray-800 flex justify-between items-center">
              <h3 className="font-bold text-lg flex items-center gap-2"><Clock size={20} className="text-[#FF4A1F]"/> Submission History</h3>
@@ -264,15 +254,9 @@ function StudentView({ activeTab, user, profile }) {
                      <tr key={item.id} className="hover:bg-white/5 transition-colors">
                        <td className="px-6 py-4 font-medium text-white">
                          {item.coding_questions?.title || "Unknown Problem"}
-                         <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 border border-gray-700">
-                           {item.coding_questions?.difficulty}
-                         </span>
+                         <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 border border-gray-700">{item.coding_questions?.difficulty}</span>
                        </td>
-                       <td className="px-6 py-4">
-                         <span className={`px-2 py-1 rounded text-xs font-bold ${item.status === 'Solved' ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>
-                           {item.status}
-                         </span>
-                       </td>
+                       <td className="px-6 py-4"><span className={`px-2 py-1 rounded text-xs font-bold ${item.status === 'Solved' ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>{item.status}</span></td>
                        <td className="px-6 py-4 text-yellow-500 font-bold">+{item.earned_coins} 🪙</td>
                        <td className="px-6 py-4 text-right text-gray-500">{new Date(item.created_at).toLocaleDateString()}</td>
                      </tr>
@@ -282,12 +266,13 @@ function StudentView({ activeTab, user, profile }) {
              )}
            </div>
         </div>
-
       </div>
     );
   }
 
+  // --- RENDER COMPONENT FOR ACTIVE TAB ---
   if (activeTab === "courses") return <CoursesList />;
+  if (activeTab === "assignments") return <StudentAssignmentView user={user} />;
   if (activeTab === "mock-interview") return <MockInterviewView user={user} />;
   
   if (activeTab === "achievements") {
@@ -303,7 +288,7 @@ function StudentView({ activeTab, user, profile }) {
   return <PlaceholderSection title={activeTab} icon={ClipboardList} />;
 }
 
-// --- CREATOR VIEW (Unchanged Logic, just rendering) ---
+// --- CREATOR VIEW ---
 function CreatorView({ activeTab }) {
   if (activeTab === "overview") {
     return (
@@ -316,6 +301,7 @@ function CreatorView({ activeTab }) {
   }
   
   if (activeTab === "manage-content") return <ManageCourses />;
+  if (activeTab === "assignments") return <AssignmentManager />;
   if (activeTab === "practice-sets") return <PracticeSetBuilder />;
 
   return <PlaceholderSection title={activeTab} icon={BookOpen} />;
@@ -323,12 +309,7 @@ function CreatorView({ activeTab }) {
 
 /* HELPER COMPONENTS */
 function StatCard({ icon: Icon, title, value, trend, color="orange" }) {
-  const colors = {
-    orange: "text-[#FF4A1F]",
-    green: "text-green-500",
-    blue: "text-blue-500"
-  };
-  
+  const colors = { orange: "text-[#FF4A1F]", green: "text-green-500", blue: "text-blue-500" };
   return (
     <div className="bg-[#111] p-6 rounded-2xl border border-gray-800">
       <div className="flex items-start justify-between">
