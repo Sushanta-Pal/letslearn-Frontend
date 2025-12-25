@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
+import { supabase } from '../../supabaseClient';
 import CodingModule from './CodingModule';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import confetti from 'canvas-confetti';

@@ -4,14 +4,14 @@ import { supabase } from "../supabaseClient.js";
 import { useNavigate } from "react-router-dom";
 
 // --- EXISTING COMPONENTS ---
-import MockInterviewView from "./MockInterviewView.jsx";
-import CoursesList from "./CoursesList.jsx"; 
-import ManageCourses from "./ManageCourses.jsx"; 
-import PracticeSetBuilder from "./PracticeSetBuilder.jsx"; 
+import MockInterviewView from "./student/MockInterviewView.jsx";
+import CoursesList from "./student/CoursesList.jsx"; 
+import ManageCourses from "./Teacher/ManageCourses.jsx"; 
+import PracticeSetBuilder from "./Teacher/PracticeSetBuilder.jsx"; 
 
 // --- NEW ASSIGNMENT COMPONENTS ---
-import AssignmentManager from "./AssignmentManager.jsx"; 
-import StudentAssignmentView from "./StudentAssignmentView.jsx";
+import AssignmentManager from "./Teacher/AssignmentManager.jsx"; 
+import StudentAssignmentView from "./student/StudentAssignmentView.jsx";
 
 import {
   LogOut, User, BookOpen, Award, Settings, PlusCircle,
@@ -133,7 +133,6 @@ export default function ProfilePage({ defaultTab = "overview" }) {
                  <SidebarItem icon={FileText} label="Assignments" active={activeTab === "assignments"} onClick={() => { setActiveTab("assignments"); setMobileMenuOpen(false); }} />
                  
                  <SidebarItem icon={Layers} label="Practice Sets" active={activeTab === "practice-sets"} onClick={() => { setActiveTab("practice-sets"); setMobileMenuOpen(false); }} />
-                 <SidebarItem icon={PlusCircle} label="Create Course" active={activeTab === "create-course"} onClick={() => navigate("/courses-upload")} />
                  <SidebarItem icon={Code} label="Add Coding Qs" active={false} onClick={() => navigate("/teacher/add-question")} />
               </>
             )}

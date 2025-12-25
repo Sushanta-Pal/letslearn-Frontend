@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Mic, BookOpen, Code, Award, Play, Lock, Shuffle, Key, Loader2, CheckCircle, Trophy, Clock, Star, Zap } from "lucide-react";
-import { supabase } from "../supabaseClient";
+import { supabase } from "../../supabaseClient";
 
 // Import Modules
 import CommunicationModule from "./CommunicationModule"; 

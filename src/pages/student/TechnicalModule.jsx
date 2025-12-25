@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Clock, CheckCircle, AlertCircle, Save, ArrowLeft, ArrowRight } from "lucide-react";
-import { supabase } from "../supabaseClient";
+import { supabase } from "../../supabaseClient";
 
 export default function TechnicalModule({ 
   user, 

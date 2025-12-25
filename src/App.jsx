@@ -5,13 +5,11 @@ import { AnimatePresence, motion } from "framer-motion";
 import LoginPage from "./pages/LoginPage";
 import SignUpPage from "./pages/SignUpPage";
 import Dashboard from "./pages/Dashboard";
-import CoursePage from "./pages/CoursePage";
 import ProfilePage from "./pages/ProfilePage";
-import CourseUploadPage from "./pages/CourseUploadPage";
-import AddQuestionPage from "./pages/AddQuestionPage"; 
-import QuestionListPage from "./pages/QuestionList"; 
-import CourseViewer from "./pages/CourseViewer";
-import SolveProblemPage from "./pages/SolveProblemPage";
+import AddQuestionPage from "./pages/Teacher/AddQuestionPage"; 
+import QuestionListPage from "./pages/student/QuestionList"; 
+import CourseViewer from "./pages/student/CourseViewer";
+import SolveProblemPage from "./pages/student/SolveProblemPage";
 
 
 const pageMotionProps = {
@@ -30,7 +28,6 @@ function AnimatedRoutes() {
         <Route path="/" element={<motion.div {...pageMotionProps}><Dashboard /></motion.div>} />
         <Route path="/signup" element={<motion.div {...pageMotionProps}><SignUpPage /></motion.div>} />
         <Route path="/login" element={<motion.div {...pageMotionProps}><LoginPage /></motion.div>} />
-        <Route path="/course/:slug" element={<motion.div {...pageMotionProps}><CoursePage /></motion.div>} />
         
         {/* Profile & Student Dashboard Routes */}
         <Route path="/profile" element={<motion.div {...pageMotionProps}><ProfilePage /></motion.div>} />
@@ -41,7 +38,6 @@ function AnimatedRoutes() {
         <Route path="/student/course/:courseId" element={<CourseViewer />} />
         <Route path="/student/solve/:questionId" element={<SolveProblemPage />} />
         {/* Teacher Routes */}
-        <Route path="/courses-upload" element={<motion.div {...pageMotionProps}><CourseUploadPage /></motion.div>} />
         <Route path="/teacher/add-question" element={<motion.div {...pageMotionProps}><AddQuestionPage /></motion.div>} />
       </Routes>
     </AnimatePresence>

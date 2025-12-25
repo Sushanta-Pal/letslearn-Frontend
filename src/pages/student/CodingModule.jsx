@@ -3,7 +3,7 @@ import {
   Play, Send, CheckCircle, XCircle, 
   Code as CodeIcon, Cpu, Clock, Terminal, AlertTriangle 
 } from "lucide-react";
-import { supabase } from "../supabaseClient";
+import { supabase } from "../../supabaseClient";
 
 // --- FALLBACK DATA (Keep this just in case no questions are passed) ---
 const FALLBACK_PROBLEMS = [

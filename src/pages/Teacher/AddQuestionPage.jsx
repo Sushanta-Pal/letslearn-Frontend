@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { supabase } from '../supabaseClient';
+import { supabase } from '../../supabaseClient';
 import { Save, Plus, Trash2, Code, Database, X } from 'lucide-react';
 
 export default function AddQuestionPage() {

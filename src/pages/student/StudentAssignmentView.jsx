@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { supabase } from '../supabaseClient';
+import { supabase } from '../../supabaseClient';
 import { Trophy, Clock, Lock, CheckCircle, AlertTriangle } from 'lucide-react';
 import TechnicalModule from './TechnicalModule';
 

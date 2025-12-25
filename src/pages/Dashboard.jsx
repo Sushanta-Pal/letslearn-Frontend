@@ -6,11 +6,9 @@ import heroImage from "../assets/heroImage.png";
 import TrustedBy from "../components/TrustedBy";
 import PricingCard from "../components/PricingCard";
 import PricingBanner from "../components/PricingBanner";
-import CourseCard from "../components/CourseCard";
 import Testimonial from "../components/ui/Testimonial";
 import FeatureSection from "../components/ui/FeatureSection";
 import MobileNav from "@/components/ui/MobileNav";
-import { courses as courseMap } from "../data/Course";
 // Import Supabase client to check auth status
 import { supabase } from "../supabaseClient";
 
@@ -19,87 +17,7 @@ export default function FoxBirdLanding() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userRole, setUserRole] = useState(null);
 
-  // --- EXISTING DATA STATE ---
-  const [courses, setCourses] = useState([
-    {
-      id: 1,
-      slug: "modern-react-with-hooks",
-      title: "Modern React with Hooks",
-      description:
-        "Go from beginner to advanced in React.js by building real-world applications. Master hooks, context, and Redux.",
-      level: "Intermediate",
-      duration: "12 Hours",
-      rating: 4.8,
-      imageUrl:
-        "https://images.unsplash.com/photo-1633356122102-3fe601e05bd2?auto=format&fit=crop&w=1470&q=80",
-      isTrending: true,
-    },
-    {
-      id: 2,
-      slug: "advanced-tailwind-css",
-      title: "Advanced Tailwind CSS",
-      description:
-        "Master the utility-first CSS framework. Learn advanced techniques, customization, and how to build complex responsive layouts.",
-      level: "Advanced",
-      duration: "8 Hours",
-      rating: 4.9,
-      imageUrl:
-        "https://images.unsplash.com/photo-1667835950375-40b5211a26d7?auto=format&fit=crop&w=1470&q=80",
-      isTrending: false,
-    },
-    {
-      id: 3,
-      slug: "complete-nodejs-developer",
-      title: "Complete Node.js Developer",
-      description:
-        "Learn Node.js from scratch. Build, test, and deploy real-time applications with Express, MongoDB, and more.",
-      level: "All Levels",
-      duration: "22 Hours",
-      rating: 4.7,
-      imageUrl:
-        "https://images.unsplash.com/photo-1639628735078-ed2f038a193e?auto=format&fit=crop&w=1470&q=80",
-      isTrending: true,
-    },
-    {
-      id: 4,
-      slug: "data-structures-and-algorithms",
-      title: "Data Structures & Algorithms",
-      description:
-        "Ace your coding interviews. A deep dive into fundamental data structures and algorithms with practical examples.",
-      level: "Intermediate",
-      duration: "18 Hours",
-      rating: 4.6,
-      imageUrl:
-        "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1470&q=80",
-      isTrending: false,
-    },
-    {
-      id: 5,
-      slug: "python-django-fullstack-web",
-      title: "Python & Django Full Stack Web",
-      description:
-        "Build and deploy powerful web applications with Python, Django, and a RESTful API. Includes databases and authentication.",
-      level: "All Levels",
-      duration: "30 Hours",
-      rating: 4.7,
-      imageUrl:
-        "https://images.unsplash.com/photo-1529101091768-7b9ada2a596b?auto=format&fit=crop&w=1470&q=80",
-      isTrending: true,
-    },
-    {
-      id: 6,
-      slug: "ui-ux-design-fundamentals",
-      title: "UI/UX Design Fundamentals",
-      description:
-        "Learn the principles of user interface and user experience design. Master Figma, wireframing, and prototyping.",
-      level: "Beginner",
-      duration: "10 Hours",
-      rating: 4.8,
-      imageUrl:
-        "https://images.unsplash.com/photo-1581291518857-4e261b9e566D?auto=format&fit=crop&w=1470&q=80",
-      isTrending: false,
-    },
-  ]);
+
 
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -182,9 +100,7 @@ export default function FoxBirdLanding() {
             <a href="#how-it-works" className="hover:text-white">
               Features
             </a>
-            <a href="#courses" className="hover:text-white">
-              Courses
-            </a>
+            
             <a href="#pricing" className="hover:text-white">
               Pricing
             </a>
@@ -494,30 +410,7 @@ export default function FoxBirdLanding() {
           </div>
         </section>
 
-        <section id="courses" className="py-14 bg-[#0F0F10]">
-          <div className="max-w-[1200px] mx-auto px-6">
-            <h2 className="text-2xl font-bold">Explore Our Courses</h2>
-            <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {Object.entries(courseMap).map(([slug, data], index) => (
-                <CourseCard
-                  key={slug}
-                  course={{
-                    slug,
-                    id: index + 1,
-                    title: data.title,
-                    description: data.description,
-                    level: data.level,
-                    duration: data.duration,
-                    rating: data.rating,
-                    imageUrl: data.banner,
-                    isTrending: index === 0,
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-        </section>
-
+        
         <section id="pricing" className="py-14 bg-[#0F0F10]">
           <div className="flex flex-wrap gap-8 justify-center mt-20">
             <PricingBanner />

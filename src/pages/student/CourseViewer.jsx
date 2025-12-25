@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
+import { supabase } from '../../supabaseClient';
 import { 
   BookOpen, Play, Code2, CheckCircle, Lock, ArrowLeft, 
   Menu, ChevronRight, Check, AlertCircle 
