@@ -9,24 +9,29 @@ import CoursesList from "./student/CoursesList.jsx";
 import ManageCourses from "./Teacher/ManageCourses.jsx"; 
 import PracticeSetBuilder from "./Teacher/PracticeSetBuilder.jsx"; 
 
-// --- NEW ASSIGNMENT COMPONENTS ---
+// --- NEW IMPORTS ---
 import AssignmentManager from "./Teacher/AssignmentManager.jsx"; 
 import StudentAssignmentView from "./student/StudentAssignmentView.jsx";
+import InternshipDashboard from "./student/Internship/InternshipDashboard.jsx"; 
 
 import {
   LogOut, User, BookOpen, Award, Settings, PlusCircle,
   BarChart2, Users, DollarSign, CheckCircle,
   Clock, Home, Menu, X, ClipboardList, Mic, Layers, 
-  Code, TrendingUp, FileText // <--- Added FileText for Assignments
+  Code, TrendingUp, FileText, Briefcase, PenTool,
+  ChevronLeft, ChevronRight
 } from "lucide-react";
 
 export default function ProfilePage({ defaultTab = "overview" }) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
-  const [profileData, setProfileData] = useState(null); // Stores coins, name, role
+  const [profileData, setProfileData] = useState(null); 
   const [role, setRole] = useState("student"); 
   const [activeTab, setActiveTab] = useState(defaultTab);
+  
+  // --- NEW: State to control sidebar visibility ---
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -36,7 +41,6 @@ export default function ProfilePage({ defaultTab = "overview" }) {
         if (!user) { navigate("/login"); return; }
         setUser(user);
         
-        // 1. Fetch Profile Data (Coins, Role)
         const { data: profile } = await supabase
           .from('profiles')
           .select('*')
@@ -49,7 +53,6 @@ export default function ProfilePage({ defaultTab = "overview" }) {
         } else {
           setRole(user.user_metadata?.role || "student");
         }
-
       } catch (error) {
         console.error("Error fetching user:", error);
       } finally {
@@ -59,25 +62,29 @@ export default function ProfilePage({ defaultTab = "overview" }) {
     getUser();
   }, [navigate]);
 
+  // --- NEW: Auto-collapse sidebar when entering specific tabs ---
+  useEffect(() => {
+    if (activeTab === "internships" || activeTab === "task-builder") {
+      setIsSidebarOpen(false); // Close sidebar for full-screen tools
+    } else {
+      setIsSidebarOpen(true); // Open sidebar for standard views
+    }
+  }, [activeTab]);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate("/");
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center text-white">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#FF4A1F]"></div>
-      </div>
-    );
-  }
+  if (loading) return <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center text-white">Loading...</div>;
   
   const userInitial = (profileData?.full_name || user?.email || "U").charAt(0).toUpperCase();
   const displayUserName = profileData?.full_name || user?.email?.split("@")[0];
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] text-white flex flex-col md:flex-row font-sans">
-      {/* MOBILE HEADER */}
+    <div className="min-h-screen bg-[#0A0A0A] text-white flex flex-col md:flex-row font-sans overflow-hidden">
+      
+      {/* --- MOBILE HEADER --- */}
       <div className="md:hidden flex items-center justify-between p-4 border-b border-gray-800 bg-[#111]">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-[#FF4A1F] flex items-center justify-center font-bold text-black text-sm">
@@ -90,11 +97,18 @@ export default function ProfilePage({ defaultTab = "overview" }) {
         </button>
       </div>
 
-      {/* SIDEBAR NAVIGATION */}
-      <aside className={`fixed md:relative z-50 w-full md:w-64 bg-[#111] border-r border-gray-800 p-6 flex flex-col justify-between h-[calc(100vh-65px)] md:h-screen transition-transform duration-300 ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"} top-[65px] md:top-0`}>
-        <div>
-          <div className="hidden md:flex items-center gap-3 mb-10">
-            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#FF4A1F] to-[#FF8C69] flex items-center justify-center text-xl font-bold text-black shadow-lg shadow-orange-500/20">
+      {/* --- SIDEBAR --- */}
+      <aside 
+        className={`
+          fixed md:relative z-50 bg-[#111] border-r border-gray-800 flex flex-col justify-between h-screen transition-all duration-300 ease-in-out
+          ${mobileMenuOpen ? "translate-x-0 w-64" : "translate-x-full md:translate-x-0"}
+          ${isSidebarOpen ? "md:w-64" : "md:w-0 md:opacity-0 md:overflow-hidden md:border-none"}
+        `}
+      >
+        <div className="p-6">
+          {/* User Info Block */}
+          <div className="hidden md:flex items-center gap-3 mb-10 whitespace-nowrap">
+            <div className="w-12 h-12 min-w-[3rem] rounded-full bg-gradient-to-br from-[#FF4A1F] to-[#FF8C69] flex items-center justify-center text-xl font-bold text-black shadow-lg shadow-orange-500/20">
               {userInitial}
             </div>
             <div className="overflow-hidden">
@@ -106,7 +120,7 @@ export default function ProfilePage({ defaultTab = "overview" }) {
           <nav className="space-y-2 relative">
             <SidebarItem icon={Home} label="Home" active={false} onClick={() => navigate("/")} />
             <div className="my-4 h-px bg-gray-800/50" />
-
+            
             <SidebarItem 
               icon={BarChart2} 
               label="Overview" 
@@ -118,9 +132,10 @@ export default function ProfilePage({ defaultTab = "overview" }) {
               <>
                 <SidebarItem icon={BookOpen} label="My Courses" active={activeTab === "courses"} onClick={() => { setActiveTab("courses"); setMobileMenuOpen(false); }} />
                 
-                {/* --- STUDENT ASSIGNMENT TAB --- */}
-                <SidebarItem icon={FileText} label="Assignments" active={activeTab === "assignments"} onClick={() => { setActiveTab("assignments"); setMobileMenuOpen(false); }} />
+                {/* Internships Click: This will trigger the useEffect to close sidebar */}
+                <SidebarItem icon={Briefcase} label="Internships" active={activeTab === "internships"} onClick={() => { setActiveTab("internships"); setMobileMenuOpen(false); }} />
                 
+                <SidebarItem icon={FileText} label="Assignments" active={activeTab === "assignments"} onClick={() => { setActiveTab("assignments"); setMobileMenuOpen(false); }} />
                 <SidebarItem icon={Mic} label="Mock Interview" active={activeTab === "mock-interview"} onClick={() => { setActiveTab("mock-interview"); setMobileMenuOpen(false); }} />
                 <SidebarItem icon={Code} label="Practice Arena" active={false} onClick={() => navigate("/student/questions")} />
                 <SidebarItem icon={Award} label="Achievements" active={activeTab === "achievements"} onClick={() => { setActiveTab("achievements"); setMobileMenuOpen(false); }} />
@@ -129,9 +144,14 @@ export default function ProfilePage({ defaultTab = "overview" }) {
               <>
                  <SidebarItem icon={BookOpen} label="Manage Content" active={activeTab === "manage-content"} onClick={() => { setActiveTab("manage-content"); setMobileMenuOpen(false); }} />
                  
-                 {/* --- TEACHER ASSIGNMENT TAB --- */}
+                 {/* Task Builder Click: This will trigger the useEffect to close sidebar */}
+                  <SidebarItem
+  icon={Briefcase} 
+  label="Post Internship" 
+  active={false} 
+  onClick={() => navigate("/teacher/create-internship")} 
+/>
                  <SidebarItem icon={FileText} label="Assignments" active={activeTab === "assignments"} onClick={() => { setActiveTab("assignments"); setMobileMenuOpen(false); }} />
-                 
                  <SidebarItem icon={Layers} label="Practice Sets" active={activeTab === "practice-sets"} onClick={() => { setActiveTab("practice-sets"); setMobileMenuOpen(false); }} />
                  <SidebarItem icon={Code} label="Add Coding Qs" active={false} onClick={() => navigate("/teacher/add-question")} />
               </>
@@ -141,28 +161,57 @@ export default function ProfilePage({ defaultTab = "overview" }) {
           </nav>
         </div>
 
-        <button onClick={handleLogout} className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all w-full mt-6">
+        <button onClick={handleLogout} className="m-6 flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all whitespace-nowrap">
           <LogOut size={20} />
           <span>Sign Out</span>
         </button>
       </aside>
 
-      {/* MAIN CONTENT AREA */}
-      <main className="flex-1 p-6 md:p-10 overflow-y-auto h-screen bg-[#0A0A0A]">
-        <header className="mb-8">
-          <h1 className="text-3xl font-bold capitalize">{activeTab.replace("-", " ")}</h1>
-          <p className="text-gray-400 mt-1">Welcome back, <span className="text-white font-medium">{displayUserName}</span>.</p>
-        </header>
+      {/* --- MAIN CONTENT AREA --- */}
+      <main className="flex-1 relative h-screen overflow-hidden bg-[#0A0A0A]">
+        
+        {/* --- TOGGLE BUTTON (Floating) --- */}
+        {/* Only show this button if the sidebar is closed */}
+        {!isSidebarOpen && (
+          <button 
+            onClick={() => setIsSidebarOpen(true)}
+            className="absolute top-4 left-4 z-40 p-2 bg-[#111] border border-gray-700 text-white rounded-full shadow-lg hover:bg-gray-800 transition-colors"
+            title="Open Menu"
+          >
+            <Menu size={20} />
+          </button>
+        )}
 
-        <AnimatePresence mode="wait">
-          <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}>
-            {role === "creator" ? (
-              <CreatorView activeTab={activeTab} />
-            ) : (
-              <StudentView activeTab={activeTab} user={user} profile={profileData} />
-            )}
-          </motion.div>
-        </AnimatePresence>
+        <div className="h-full overflow-y-auto">
+            {/* If sidebar is OPEN, we add padding. If CLOSED (Internships), no padding for full screen feel */}
+            <div className={isSidebarOpen ? "p-6 md:p-10" : "p-0"}>
+                
+                {/* Standard Header (Hide on full screen views) */}
+                {activeTab !== "internships" && activeTab !== "task-builder" && (
+                  <header className="mb-8">
+                    <h1 className="text-3xl font-bold capitalize">{activeTab.replace("-", " ")}</h1>
+                    <p className="text-gray-400 mt-1">Welcome back, <span className="text-white font-medium">{displayUserName}</span>.</p>
+                  </header>
+                )}
+
+                <AnimatePresence mode="wait">
+                  <motion.div 
+                    key={activeTab} 
+                    initial={{ opacity: 0, y: 10 }} 
+                    animate={{ opacity: 1, y: 0 }} 
+                    exit={{ opacity: 0, y: -10 }} 
+                    transition={{ duration: 0.2 }}
+                    className="h-full"
+                  >
+                    {role === "creator" || role === "teacher" ? (
+                      <CreatorView activeTab={activeTab} />
+                    ) : (
+                      <StudentView activeTab={activeTab} user={user} profile={profileData} />
+                    )}
+                  </motion.div>
+                </AnimatePresence>
+            </div>
+        </div>
       </main>
     </div>
   );
@@ -269,9 +318,13 @@ function StudentView({ activeTab, user, profile }) {
     );
   }
 
-  // --- RENDER COMPONENT FOR ACTIVE TAB ---
+  // --- RENDERING TABS ---
   if (activeTab === "courses") return <CoursesList />;
   if (activeTab === "assignments") return <StudentAssignmentView user={user} />;
+  
+  // NEW: This renders the Full Screen Glass Dashboard
+  if (activeTab === "internships") return <InternshipDashboard />; 
+  
   if (activeTab === "mock-interview") return <MockInterviewView user={user} />;
   
   if (activeTab === "achievements") {
@@ -301,6 +354,10 @@ function CreatorView({ activeTab }) {
   
   if (activeTab === "manage-content") return <ManageCourses />;
   if (activeTab === "assignments") return <AssignmentManager />;
+  
+  // NEW: This renders the Full Screen Task Builder
+  if (activeTab === "task-builder") return <TaskBuilder />; 
+  
   if (activeTab === "practice-sets") return <PracticeSetBuilder />;
 
   return <PlaceholderSection title={activeTab} icon={BookOpen} />;

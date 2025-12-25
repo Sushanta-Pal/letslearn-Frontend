@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Mic, BookOpen, Code, Award, Play, Lock, Shuffle, Key, Loader2, CheckCircle, Trophy, Clock, Star, Zap } from "lucide-react";
+import { Mic, BookOpen, Code, Trophy, Star, Loader2, Shuffle, Key, Clock, Lock, CheckCircle, ArrowRight } from "lucide-react";
 import { supabase } from "../../supabaseClient";
 
 // Import Modules
@@ -7,9 +7,11 @@ import CommunicationModule from "./CommunicationModule";
 import TechnicalModule from "./TechnicalModule"; 
 import CodingModule from "./CodingModule"; 
 
-export default function MockInterviewView({ user }) {
+// Accepted Props: user (obj), initialSessionId (string - optional)
+export default function MockInterviewView({ user, initialSessionId }) {
+  
   // --- STATE ---
-  const [activeSessionId, setActiveSessionId] = useState(null);
+  const [activeSessionId, setActiveSessionId] = useState(initialSessionId || null);
   const [sessionData, setSessionData] = useState(null); 
   const [stage, setStage] = useState("lobby"); // lobby, dashboard, communication, technical, coding, summary
   
@@ -20,20 +22,79 @@ export default function MockInterviewView({ user }) {
   const [accessKey, setAccessKey] = useState("");
   const [history, setHistory] = useState([]);
 
-  // Fetch History on Load
+  // --- 1. AUTO-START LOGIC (The Fix) ---
   useEffect(() => {
-    const fetchHistory = async () => {
-      const { data } = await supabase
+    // If we passed an ID via URL/Props, load that session immediately
+    if (initialSessionId) {
+      loadExistingSession(initialSessionId);
+    } else {
+      fetchHistory();
+    }
+  }, [initialSessionId, user]);
+
+  const fetchHistory = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('mock_interview_sessions')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+    if(data) setHistory(data);
+  };
+
+  const loadExistingSession = async (sessionId) => {
+    setLoading(true);
+    try {
+      // 1. Fetch Session Details
+      const { data: session, error } = await supabase
         .from('mock_interview_sessions')
         .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-      if(data) setHistory(data);
-    };
-    if(user) fetchHistory();
-  }, [user, activeSessionId, stage]); // Refresh history when stage changes
+        .eq('id', sessionId)
+        .single();
 
-  // --- LOBBY ACTIONS ---
+      if (error || !session) throw new Error("Session not found");
+
+      // 2. Fetch the Practice Set Data (Questions)
+      const { data: practiceSet } = await supabase
+        .from('practice_sets')
+        .select('data')
+        .eq('id', session.metadata.set_id)
+        .single();
+
+      // 3. Restore State
+      setActiveSessionId(sessionId);
+      setSessionData(practiceSet.data);
+      
+      // Restore Scores if partial progress
+      setScores({
+        comm: session.communication_score || 0,
+        tech: session.technical_score || 0,
+        coding: session.coding_score || 0
+      });
+
+      // Unlock stages based on progress
+      setUnlocked({
+        tech: (session.communication_score || 0) > 0,
+        coding: (session.technical_score || 0) > 0
+      });
+
+      // Decide Stage
+      if (session.status === 'completed') {
+        setStage("summary");
+      } else {
+        setStage("dashboard");
+      }
+
+    } catch (err) {
+      console.error(err);
+      alert("Could not load the requested interview.");
+      setStage("lobby");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- LOBBY ACTIONS (Standard Flow) ---
   const startRandomSet = async () => {
     setLoading(true);
     try {
@@ -87,25 +148,29 @@ export default function MockInterviewView({ user }) {
   };
 
   const onCodingFinish = async (score) => {
-    // 1. Update DB
     await supabase.from('mock_interview_sessions')
       .update({ coding_score: score, status: 'completed' })
       .eq('id', activeSessionId);
 
-    // 2. Update Local State
     setScores(prev => ({...prev, coding: score}));
-    
-    // 3. SHOW FINAL BADGE SCREEN (Instead of dashboard)
     setStage("summary"); 
   };
 
   const handleExit = () => {
-    setStage("lobby");
-    setActiveSessionId(null);
-    setSessionData(null);
+    // If it was a deep link (auto-start), go back to Internship Dashboard, not Lobby
+    if(initialSessionId) {
+        window.history.back(); // Or navigate('/student/internships')
+    } else {
+        setStage("lobby");
+        setActiveSessionId(null);
+        setSessionData(null);
+        fetchHistory(); // Refresh list
+    }
   };
 
   // --- RENDERING ---
+
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-black text-white"><Loader2 className="animate-spin text-[#FF4A1F]" size={40}/></div>;
 
   if (stage === "lobby") {
     return (
@@ -117,7 +182,7 @@ export default function MockInterviewView({ user }) {
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
                 <button onClick={startRandomSet} disabled={loading} className="bg-black border border-gray-800 p-6 rounded-2xl hover:border-[#FF4A1F] transition-all group text-left">
                    <div className="flex items-center gap-4 mb-2">
-                     <div className="p-3 bg-blue-900/20 text-blue-500 rounded-lg group-hover:scale-110 transition-transform">{loading ? <Loader2 className="animate-spin"/> : <Shuffle size={24}/>}</div>
+                     <div className="p-3 bg-blue-900/20 text-blue-500 rounded-lg group-hover:scale-110 transition-transform"><Shuffle size={24}/></div>
                      <span className="font-bold text-white text-lg">Random Mock</span>
                    </div>
                    <p className="text-sm text-gray-500">Practice with a randomly generated set.</p>
@@ -135,6 +200,8 @@ export default function MockInterviewView({ user }) {
              </div>
            </div>
         </div>
+        
+        {/* History Table */}
         <div className="bg-[#0A0A0A] border border-gray-800 rounded-2xl p-6">
            <h3 className="text-xl font-bold mb-6 flex items-center gap-2"><Clock size={20}/> Previous Attempts</h3>
            <div className="overflow-x-auto">
@@ -142,13 +209,12 @@ export default function MockInterviewView({ user }) {
                <thead><tr className="border-b border-gray-800 text-gray-500 uppercase text-xs"><th className="py-3">Date</th><th className="py-3">Status</th><th className="py-3">Comm.</th><th className="py-3">Tech</th><th className="py-3">Coding</th></tr></thead>
                <tbody>
                  {history.map(h => (
-                   <tr key={h.id} className="border-b border-gray-800/50">
+                   <tr key={h.id} className="border-b border-gray-800/50 hover:bg-white/5 cursor-pointer" onClick={() => loadExistingSession(h.id)}>
                      <td className="py-3">{new Date(h.created_at).toLocaleDateString()}</td>
                      <td className="py-3"><span className={`px-2 py-1 rounded text-xs font-bold ${h.status === 'completed' ? 'bg-green-900/30 text-green-500' : 'bg-red-900/30 text-red-500'}`}>{h.status}</span></td>
                      <td className="py-3">{h.communication_score}%</td><td className="py-3">{h.technical_passed ? 'Pass' : 'Fail'}</td><td className="py-3">{h.coding_score || '-'}%</td>
                    </tr>
                  ))}
-                 {history.length === 0 && <tr><td colSpan="5" className="py-8 text-center italic">No history found.</td></tr>}
                </tbody>
              </table>
            </div>
@@ -177,19 +243,23 @@ export default function MockInterviewView({ user }) {
   // --- FINAL SUMMARY BADGE VIEW ---
   if (stage === "summary") {
     const totalScore = Math.round((scores.comm + scores.tech + scores.coding) / 3);
+    const passed = scores.comm >= 60 && scores.tech >= 60 && scores.coding >= 60; // Pass Logic
+
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#050505] p-6 animate-in zoom-in duration-500">
          <div className="bg-[#111] border border-gray-800 rounded-3xl p-10 max-w-2xl w-full text-center relative overflow-hidden shadow-2xl">
-            {/* Background Glow */}
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-64 bg-orange-500/20 blur-[100px] rounded-full pointer-events-none"></div>
+            {/* Background Glow - Green for Pass, Red for Fail */}
+            <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-64 h-64 ${passed ? 'bg-green-500/20' : 'bg-red-500/20'} blur-[100px] rounded-full pointer-events-none`}></div>
             
             <div className="relative z-10">
-                <div className="inline-block p-4 bg-gradient-to-br from-yellow-400 to-orange-600 rounded-full mb-6 shadow-xl shadow-orange-900/40">
-                    <Trophy size={64} className="text-black" />
+                <div className={`inline-block p-4 rounded-full mb-6 shadow-xl ${passed ? 'bg-green-500 text-black' : 'bg-red-500 text-white'}`}>
+                    {passed ? <Trophy size={64} /> : <Lock size={64} />}
                 </div>
                 
-                <h1 className="text-4xl font-extrabold text-white mb-2">Interview Completed!</h1>
-                <p className="text-gray-400 mb-8">You have successfully cleared all 3 rounds.</p>
+                <h1 className="text-4xl font-extrabold text-white mb-2">{passed ? "Assessment Passed!" : "Assessment Failed"}</h1>
+                <p className="text-gray-400 mb-8">
+                   {passed ? "You have met the requirements for this role." : "You did not meet the minimum score (60%) in all sections."}
+                </p>
 
                 <div className="grid grid-cols-3 gap-4 mb-8">
                     <ScoreBox label="Comm." score={scores.comm} />
@@ -207,9 +277,9 @@ export default function MockInterviewView({ user }) {
 
                 <button 
                     onClick={handleExit} 
-                    className="w-full bg-white text-black font-bold py-4 rounded-xl hover:scale-[1.02] transition-transform flex items-center justify-center gap-2"
+                    className={`w-full font-bold py-4 rounded-xl hover:scale-[1.02] transition-transform flex items-center justify-center gap-2 ${passed ? 'bg-white text-black' : 'bg-gray-800 text-gray-400'}`}
                 >
-                    Return to Lobby <ArrowRight size={20}/>
+                    {passed ? "Return to Internship Hub" : "Try Again Later"} <ArrowRight size={20}/>
                 </button>
             </div>
          </div>
@@ -218,14 +288,14 @@ export default function MockInterviewView({ user }) {
   }
 
   // --- MODULE VIEWS ---
-  if (stage === "communication") return <CommunicationModule user={user} sessionId={activeSessionId} onComplete={onCommFinish} onCancel={() => setStage("dashboard")} customData={sessionData.communication} />;
-  if (stage === "technical") return <TechnicalModule user={user} sessionId={activeSessionId} onComplete={onTechFinish} onCancel={() => setStage("dashboard")} questions={sessionData.technical} />;
-  if (stage === "coding") return <CodingModule user={user} sessionId={activeSessionId} onComplete={onCodingFinish} onCancel={() => setStage("dashboard")} problems={sessionData.coding} />;
+  if (stage === "communication") return <CommunicationModule user={user} sessionId={activeSessionId} onComplete={onCommFinish} onCancel={() => setStage("dashboard")} customData={sessionData?.communication} />;
+  if (stage === "technical") return <TechnicalModule user={user} sessionId={activeSessionId} onComplete={onTechFinish} onCancel={() => setStage("dashboard")} questions={sessionData?.technical} />;
+  if (stage === "coding") return <CodingModule user={user} sessionId={activeSessionId} onComplete={onCodingFinish} onCancel={() => setStage("dashboard")} problems={sessionData?.coding} />;
 
   return <div>Error: Unknown Stage</div>;
 }
 
-// Helpers
+// Helpers (Keep as they are)
 const DashboardCard = ({ title, icon: Icon, status, score, onClick, locked }) => (
   <div onClick={!locked ? onClick : null} className={`p-6 rounded-2xl border transition-all ${locked ? 'bg-[#111] border-gray-800 opacity-50 cursor-not-allowed' : 'bg-black border-gray-700 hover:border-[#FF4A1F] cursor-pointer'}`}>
     <div className="flex justify-between mb-4">
@@ -244,9 +314,4 @@ const ScoreBox = ({ label, score }) => (
         <p className="text-[10px] text-gray-500 uppercase mb-1">{label}</p>
         <span className={`text-xl font-bold ${score >= 60 ? 'text-green-400' : 'text-orange-400'}`}>{score}</span>
     </div>
-);
-
-// Icon helper
-const ArrowRight = ({size}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
 );
