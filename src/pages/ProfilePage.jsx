@@ -3,71 +3,107 @@ import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "../supabaseClient.js";
 import { useNavigate } from "react-router-dom";
 
-// --- EXISTING COMPONENTS ---
+// --- COMPONENTS ---
 import MockInterviewView from "./student/MockInterviewView.jsx";
 import CoursesList from "./student/CoursesList.jsx"; 
 import ManageCourses from "./Teacher/ManageCourses.jsx"; 
 import PracticeSetBuilder from "./Teacher/PracticeSetBuilder.jsx"; 
-
-// --- NEW IMPORTS ---
 import AssignmentManager from "./Teacher/AssignmentManager.jsx"; 
 import StudentAssignmentView from "./student/StudentAssignmentView.jsx";
 import InternshipDashboard from "./student/Internship/InternshipDashboard.jsx"; 
+import CertificateModal from "./student/CertificateModal.jsx"; // Ensure this file exists
 
 import {
-  LogOut, User, BookOpen, Award, Settings, PlusCircle,
+  LogOut, User, BookOpen, Award, Settings,
   BarChart2, Users, DollarSign, CheckCircle,
   Clock, Home, Menu, X, ClipboardList, Mic, Layers, 
   Code, TrendingUp, FileText, Briefcase, PenTool,
-  ChevronLeft, ChevronRight
+  Zap, Shield
 } from "lucide-react";
 
 export default function ProfilePage({ defaultTab = "overview" }) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  
+  // Data State
   const [user, setUser] = useState(null);
   const [profileData, setProfileData] = useState(null); 
+  const [unifiedStats, setUnifiedStats] = useState({
+    xp: 0,
+    coins: 0,
+    rank: "Intern"
+  });
+  
+  // Certificate State
+  const [certificates, setCertificates] = useState([]);
+  const [selectedCert, setSelectedCert] = useState(null);
+
   const [role, setRole] = useState("student"); 
   const [activeTab, setActiveTab] = useState(defaultTab);
-  
-  // --- NEW: State to control sidebar visibility ---
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
-    const getUser = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { navigate("/login"); return; }
-        setUser(user);
-        
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-        
-        if (profile) {
-          setProfileData(profile);
-          setRole(profile.role || "student");
-        } else {
-          setRole(user.user_metadata?.role || "student");
-        }
-      } catch (error) {
-        console.error("Error fetching user:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    getUser();
+    fetchProfileData();
   }, [navigate]);
 
-  // --- NEW: Auto-collapse sidebar when entering specific tabs ---
+  const fetchProfileData = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { navigate("/login"); return; }
+      setUser(user);
+      
+      // 1. Fetch Profile (Identity & Practice Coins)
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+      
+      if (profile) {
+        setProfileData(profile);
+        setRole(profile.role || "student");
+      }
+
+      // 2. Fetch Internship Stats (XP & Internship Coins)
+      const { data: internStats } = await supabase
+        .from('user_internship_stats')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      // 3. Fetch Certificates
+      const { data: certs } = await supabase
+        .from('certificates')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('issued_at', { ascending: false });
+      
+      setCertificates(certs || []);
+
+      // 4. COMBINE LOGIC
+      const practiceCoins = profile?.total_coins || 0; 
+      const internshipCoins = internStats?.coins || 0;
+      
+      setUnifiedStats({
+          xp: internStats?.total_xp || 0,
+          coins: practiceCoins + internshipCoins,
+          rank: internStats?.career_role || "Intern"
+      });
+
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Auto-Collapse Sidebar
   useEffect(() => {
-    if (activeTab === "internships" || activeTab === "task-builder") {
-      setIsSidebarOpen(false); // Close sidebar for full-screen tools
+    if (activeTab === "internships") {
+      setIsSidebarOpen(false); 
     } else {
-      setIsSidebarOpen(true); // Open sidebar for standard views
+      setIsSidebarOpen(true); 
     }
   }, [activeTab]);
 
@@ -76,7 +112,7 @@ export default function ProfilePage({ defaultTab = "overview" }) {
     navigate("/");
   };
 
-  if (loading) return <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center text-white">Loading...</div>;
+  if (loading) return <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center text-white"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-[#FF4A1F]"></div></div>;
   
   const userInitial = (profileData?.full_name || user?.email || "U").charAt(0).toUpperCase();
   const displayUserName = profileData?.full_name || user?.email?.split("@")[0];
@@ -106,14 +142,15 @@ export default function ProfilePage({ defaultTab = "overview" }) {
         `}
       >
         <div className="p-6">
-          {/* User Info Block */}
           <div className="hidden md:flex items-center gap-3 mb-10 whitespace-nowrap">
             <div className="w-12 h-12 min-w-[3rem] rounded-full bg-gradient-to-br from-[#FF4A1F] to-[#FF8C69] flex items-center justify-center text-xl font-bold text-black shadow-lg shadow-orange-500/20">
               {userInitial}
             </div>
             <div className="overflow-hidden">
               <h3 className="font-semibold truncate w-32">{displayUserName}</h3>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-800 text-gray-400 border border-gray-700 uppercase tracking-wider">{role}</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-800 text-gray-400 border border-gray-700 uppercase tracking-wider">
+                {unifiedStats.rank}
+              </span>
             </div>
           </div>
 
@@ -131,10 +168,7 @@ export default function ProfilePage({ defaultTab = "overview" }) {
             {role === "student" ? (
               <>
                 <SidebarItem icon={BookOpen} label="My Courses" active={activeTab === "courses"} onClick={() => { setActiveTab("courses"); setMobileMenuOpen(false); }} />
-                
-                {/* Internships Click: This will trigger the useEffect to close sidebar */}
                 <SidebarItem icon={Briefcase} label="Internships" active={activeTab === "internships"} onClick={() => { setActiveTab("internships"); setMobileMenuOpen(false); }} />
-                
                 <SidebarItem icon={FileText} label="Assignments" active={activeTab === "assignments"} onClick={() => { setActiveTab("assignments"); setMobileMenuOpen(false); }} />
                 <SidebarItem icon={Mic} label="Mock Interview" active={activeTab === "mock-interview"} onClick={() => { setActiveTab("mock-interview"); setMobileMenuOpen(false); }} />
                 <SidebarItem icon={Code} label="Practice Arena" active={false} onClick={() => navigate("/student/questions")} />
@@ -143,14 +177,7 @@ export default function ProfilePage({ defaultTab = "overview" }) {
             ) : (
               <>
                  <SidebarItem icon={BookOpen} label="Manage Content" active={activeTab === "manage-content"} onClick={() => { setActiveTab("manage-content"); setMobileMenuOpen(false); }} />
-                 
-                 {/* Task Builder Click: This will trigger the useEffect to close sidebar */}
-                  <SidebarItem
-  icon={Briefcase} 
-  label="Post Internship" 
-  active={false} 
-  onClick={() => navigate("/teacher/create-internship")} 
-/>
+                 <SidebarItem icon={Briefcase} label="Post Internship" active={false} onClick={() => navigate("/teacher/create-internship")} />
                  <SidebarItem icon={FileText} label="Assignments" active={activeTab === "assignments"} onClick={() => { setActiveTab("assignments"); setMobileMenuOpen(false); }} />
                  <SidebarItem icon={Layers} label="Practice Sets" active={activeTab === "practice-sets"} onClick={() => { setActiveTab("practice-sets"); setMobileMenuOpen(false); }} />
                  <SidebarItem icon={Code} label="Add Coding Qs" active={false} onClick={() => navigate("/teacher/add-question")} />
@@ -170,24 +197,19 @@ export default function ProfilePage({ defaultTab = "overview" }) {
       {/* --- MAIN CONTENT AREA --- */}
       <main className="flex-1 relative h-screen overflow-hidden bg-[#0A0A0A]">
         
-        {/* --- TOGGLE BUTTON (Floating) --- */}
-        {/* Only show this button if the sidebar is closed */}
         {!isSidebarOpen && (
           <button 
             onClick={() => setIsSidebarOpen(true)}
             className="absolute top-4 left-4 z-40 p-2 bg-[#111] border border-gray-700 text-white rounded-full shadow-lg hover:bg-gray-800 transition-colors"
-            title="Open Menu"
           >
             <Menu size={20} />
           </button>
         )}
 
         <div className="h-full overflow-y-auto">
-            {/* If sidebar is OPEN, we add padding. If CLOSED (Internships), no padding for full screen feel */}
             <div className={isSidebarOpen ? "p-6 md:p-10" : "p-0"}>
                 
-                {/* Standard Header (Hide on full screen views) */}
-                {activeTab !== "internships" && activeTab !== "task-builder" && (
+                {activeTab !== "internships" && (
                   <header className="mb-8">
                     <h1 className="text-3xl font-bold capitalize">{activeTab.replace("-", " ")}</h1>
                     <p className="text-gray-400 mt-1">Welcome back, <span className="text-white font-medium">{displayUserName}</span>.</p>
@@ -206,24 +228,40 @@ export default function ProfilePage({ defaultTab = "overview" }) {
                     {role === "creator" || role === "teacher" ? (
                       <CreatorView activeTab={activeTab} />
                     ) : (
-                      <StudentView activeTab={activeTab} user={user} profile={profileData} />
+                      <StudentView 
+                        activeTab={activeTab} 
+                        user={user} 
+                        stats={unifiedStats}
+                        certificates={certificates}
+                        onViewCert={setSelectedCert} // Pass handler
+                      />
                     )}
                   </motion.div>
                 </AnimatePresence>
             </div>
         </div>
       </main>
+
+      {/* --- CERTIFICATE MODAL --- */}
+      {selectedCert && (
+        <CertificateModal 
+          certificate={selectedCert} 
+          user={user} 
+          onClose={() => setSelectedCert(null)} 
+        />
+      )}
+
     </div>
   );
 }
 
-/* ---------------- SUB-COMPONENTS ---------------- */
+// --- SUB-COMPONENTS ---
 
 function SidebarItem({ icon: Icon, label, active, onClick }) {
   return (
     <button onClick={onClick} className={`relative flex items-center gap-3 px-4 py-3 w-full rounded-xl transition-colors duration-200 ${active ? "text-[#FF4A1F] font-medium" : "text-gray-400 hover:text-white hover:bg-white/5"}`}>
       {active && (
-        <motion.div layoutId="active-sidebar-bg" className="absolute inset-0 bg-[#FF4A1F]/10 border border-[#FF4A1F]/20 rounded-xl" initial={false} transition={{ type: "spring", stiffness: 350, damping: 30 }} />
+        <motion.div layoutId="active-sidebar-bg" className="absolute inset-0 bg-[#FF4A1F]/10 border border-[#FF4A1F]/20 rounded-xl" />
       )}
       <div className="relative z-10 flex items-center gap-3">
         <Icon size={20} />
@@ -234,7 +272,7 @@ function SidebarItem({ icon: Icon, label, active, onClick }) {
 }
 
 // --- STUDENT VIEW ---
-function StudentView({ activeTab, user, profile }) {
+function StudentView({ activeTab, user, stats, certificates, onViewCert }) {
   const [history, setHistory] = useState([]);
   const [loadingHist, setLoadingHist] = useState(true);
 
@@ -243,10 +281,7 @@ function StudentView({ activeTab, user, profile }) {
       const fetchHistory = async () => {
         const { data, error } = await supabase
           .from('student_solutions')
-          .select(`
-            id, status, earned_coins, created_at,
-            coding_questions ( title, difficulty )
-          `)
+          .select(`id, status, earned_coins, created_at, coding_questions(title, difficulty)`)
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
           .limit(5);
@@ -259,29 +294,88 @@ function StudentView({ activeTab, user, profile }) {
   }, [activeTab, user]);
 
   if (activeTab === "overview") {
+    const { xp, coins, rank } = stats;
+    
+    // XP Calculation based on Industry Roles
+    let nextRankXp = 1000;
+    if(xp >= 1000) nextRankXp = 5000;
+    if(xp >= 5000) nextRankXp = 15000;  // SDE I
+    if(xp >= 15000) nextRankXp = 30000; // SDE II
+    
+    const progressPercent = Math.min((xp / nextRankXp) * 100, 100);
+
     return (
       <div className="space-y-8">
+        {/* 1. Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-gradient-to-br from-yellow-900/40 to-black border border-yellow-700/30 p-6 rounded-2xl relative overflow-hidden shadow-lg group">
-             <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-               <DollarSign size={100} />
+          <div className="bg-gradient-to-br from-indigo-900/40 to-black border border-indigo-700/30 p-6 rounded-2xl relative overflow-hidden shadow-lg">
+             <div className="absolute top-0 right-0 p-4 opacity-10"><Zap size={100} /></div>
+             <h3 className="text-indigo-400 font-bold uppercase text-xs tracking-widest mb-1">Experience Points</h3>
+             <div className="text-4xl font-black text-white">{xp} <span className="text-lg text-indigo-400">XP</span></div>
+             <div className="mt-4 w-full bg-gray-800 rounded-full h-1.5">
+                <div className="bg-indigo-500 h-1.5 rounded-full" style={{ width: `${progressPercent}%` }}></div>
              </div>
+             <p className="text-xs text-gray-500 mt-2">{xp} / {nextRankXp} to next Level</p>
+          </div>
+
+          <div className="bg-gradient-to-br from-yellow-900/40 to-black border border-yellow-700/30 p-6 rounded-2xl relative overflow-hidden shadow-lg">
+             <div className="absolute top-0 right-0 p-4 opacity-10"><DollarSign size={100} /></div>
              <h3 className="text-yellow-500 font-bold uppercase text-xs tracking-widest mb-1">Total Balance</h3>
              <div className="text-4xl font-black text-white flex items-center gap-2">
-                {profile?.total_coins || 0} <span className="text-2xl text-yellow-500">🪙</span>
+                {coins} <span className="text-2xl text-yellow-500">🪙</span>
              </div>
-             <p className="text-gray-400 text-xs mt-2">Earn more by solving challenges!</p>
+             <p className="text-gray-400 text-xs mt-2">Combined wallet (Internship + Arena)</p>
           </div>
-          <StatCard icon={CheckCircle} title="Problems Solved" value={history.length} trend="+2 this week" color="green" />
-          <StatCard icon={TrendingUp} title="Global Rank" value="#42" trend="Top 5%" color="blue" />
+
+          <div className="bg-[#111] border border-gray-800 p-6 rounded-2xl flex flex-col justify-between">
+             <h3 className="text-gray-500 font-bold uppercase text-xs tracking-widest mb-1">Current Title</h3>
+             <div className="text-3xl font-black text-white flex items-center gap-2">
+                <Shield className="text-[#FF4A1F]" /> {rank}
+             </div>
+             <p className="text-xs text-gray-500 mt-2">Next: {xp < 1000 ? "Junior Dev" : xp < 5000 ? "SDE I" : "SDE II"}</p>
+          </div>
         </div>
 
-        <div className="bg-[#111] border border-gray-800 rounded-2xl overflow-hidden">
+        {/* 2. Certificates Section */}
+        {certificates && certificates.length > 0 && (
+          <div className="mt-8">
+            <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+              <Award className="text-emerald-500" /> Earned Certificates
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {certificates.map((cert) => (
+                <div 
+                  key={cert.id} 
+                  className="bg-[#161616] p-4 rounded-xl border border-gray-800 flex items-center justify-between hover:border-emerald-500/50 transition-colors group cursor-pointer"
+                  onClick={() => onViewCert(cert)} 
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="bg-emerald-900/20 p-3 rounded-lg text-emerald-500 group-hover:scale-110 transition-transform">
+                      <Award size={24} />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-white group-hover:text-emerald-400 transition-colors">
+                        {cert.title || "Certificate of Completion"}
+                      </h4>
+                      <p className="text-xs text-gray-500">
+                        Issued: {new Date(cert.issued_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                  <button className="text-xs bg-gray-800 hover:bg-emerald-600 px-3 py-1.5 rounded text-white transition-colors">
+                    View
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 3. History Table */}
+        <div className="bg-[#111] border border-gray-800 rounded-2xl overflow-hidden mt-8">
            <div className="p-6 border-b border-gray-800 flex justify-between items-center">
-             <h3 className="font-bold text-lg flex items-center gap-2"><Clock size={20} className="text-[#FF4A1F]"/> Submission History</h3>
-             <button className="text-xs text-gray-500 hover:text-white">View All</button>
+             <h3 className="font-bold text-lg flex items-center gap-2"><Clock size={20} className="text-[#FF4A1F]"/> Recent Activity</h3>
            </div>
-           
            <div className="p-0">
              {loadingHist ? (
                <div className="p-8 text-center text-gray-500">Loading history...</div>
@@ -321,18 +415,24 @@ function StudentView({ activeTab, user, profile }) {
   // --- RENDERING TABS ---
   if (activeTab === "courses") return <CoursesList />;
   if (activeTab === "assignments") return <StudentAssignmentView user={user} />;
-  
-  // NEW: This renders the Full Screen Glass Dashboard
   if (activeTab === "internships") return <InternshipDashboard />; 
-  
   if (activeTab === "mock-interview") return <MockInterviewView user={user} />;
   
   if (activeTab === "achievements") {
+    const { xp, coins } = stats;
+    // Achievement Logic
+    const earnedBadges = [
+      { id: 1, title: "First Step", icon: "🚀", unlocked: true },
+      { id: 2, title: "Intern", icon: "👨‍💻", unlocked: xp >= 0 },
+      { id: 3, title: "SDE I", icon: "⚔️", unlocked: xp >= 5000 },
+      { id: 4, title: "Richie Rich", icon: "💰", unlocked: coins >= 1000 },
+    ];
+
     return (
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <AchievementCard title="Fast Starter" icon="🚀" unlocked />
-        <AchievementCard title="Code Warrior" icon="⚔️" unlocked />
-        <AchievementCard title="React Master" icon="⚛️" unlocked={false} />
+        {earnedBadges.map(b => (
+           <AchievementCard key={b.id} title={b.title} icon={b.icon} unlocked={b.unlocked} />
+        ))}
       </div>
     );
   }
@@ -354,10 +454,6 @@ function CreatorView({ activeTab }) {
   
   if (activeTab === "manage-content") return <ManageCourses />;
   if (activeTab === "assignments") return <AssignmentManager />;
-  
-  // NEW: This renders the Full Screen Task Builder
-  if (activeTab === "task-builder") return <TaskBuilder />; 
-  
   if (activeTab === "practice-sets") return <PracticeSetBuilder />;
 
   return <PlaceholderSection title={activeTab} icon={BookOpen} />;
@@ -385,6 +481,7 @@ function AchievementCard({ title, icon, unlocked }) {
     <div className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-2 ${unlocked ? "bg-[#111] border-gray-800" : "bg-[#0A0A0A] border-gray-900 opacity-50 grayscale"}`}>
       <div className="text-3xl mb-1">{icon}</div>
       <span className="text-xs font-bold">{title}</span>
+      {unlocked ? <span className="text-[10px] text-green-500">Unlocked</span> : <span className="text-[10px] text-gray-600">Locked</span>}
     </div>
   );
 }
@@ -394,7 +491,6 @@ function PlaceholderSection({ title, icon: Icon }) {
     <div className="flex flex-col items-center justify-center h-96 text-gray-500 border border-dashed border-gray-800 rounded-2xl bg-[#111]/50">
       <Icon size={48} className="mb-4 opacity-50" />
       <h3 className="text-lg font-semibold capitalize">{title} Content Coming Soon</h3>
-      <p className="text-sm mt-2 max-w-xs text-center opacity-70">We're working on building the {title} module.</p>
     </div>
   );
 }
