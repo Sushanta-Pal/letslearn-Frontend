@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { 
   Play, Send, CheckCircle, XCircle, 
-  Code as CodeIcon, Cpu, Clock, Terminal, AlertTriangle 
+  Code, Cpu, Clock, Terminal, AlertTriangle, Sparkles, Zap, FileCode 
 } from "lucide-react";
 import { supabase } from "../../supabaseClient";
 
@@ -27,36 +27,34 @@ const LANGUAGE_VERSIONS = {
   cpp: { language: "c++", version: "10.2.0", file: "main.cpp" }
 };
 
-// ✅ 1. Accept 'problems' prop from MockInterviewView
 const CodingModule = ({ user, sessionId, onComplete, onCancel, problems }) => {
   
-  // Use passed problems, or fallback if empty
   const availableProblems = (problems && problems.length > 0) ? problems : FALLBACK_PROBLEMS;
 
-  const [problem, setProblem] = useState(availableProblems[0]); // Default to first problem
+  const [problem, setProblem] = useState(availableProblems[0]);
   const [language, setLanguage] = useState("java");
   const [code, setCode] = useState("");
   
-  // Execution State
   const [isRunning, setIsRunning] = useState(false);
   const [consoleOutput, setConsoleOutput] = useState(null); 
   const [testResults, setTestResults] = useState([]); 
   const [finalStatus, setFinalStatus] = useState(null); 
 
-  const [timeLeft, setTimeLeft] = useState(45 * 60); 
+  const [timeLeft, setTimeLeft] = useState(45 * 60);
+  
+  // Resizable panels state
+  const [leftPanelWidth, setLeftPanelWidth] = useState(40); // percentage
+  const [consoleHeight, setConsoleHeight] = useState(224); // pixels
+  const [isDraggingVertical, setIsDraggingVertical] = useState(false);
+  const [isDraggingHorizontal, setIsDraggingHorizontal] = useState(false); 
 
-  // ✅ 2. Initialize with the selected problem
   useEffect(() => {
-    // If multiple problems were passed, you could let user choose or rotate them.
-    // For now, we take the first one.
     const activeProblem = availableProblems[0];
     setProblem(activeProblem);
     
-    // Safety check for starterCode (in case MongoDB data is missing it)
     const initialCode = activeProblem.starterCode?.[language] || getDefaultStarterCode(language);
     setCode(initialCode);
 
-    // Timer
     const timer = setInterval(() => {
       setTimeLeft(prev => {
         if(prev <= 1) { clearInterval(timer); return 0; }
@@ -64,9 +62,64 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems }) => {
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, [availableProblems]); // Run when problems prop changes
+  }, [availableProblems]);
 
-  // Helper to generate basic starter code if missing
+  // Handle vertical resize (left panel width)
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (isDraggingVertical) {
+        const container = document.getElementById('split-container');
+        if (container) {
+          const rect = container.getBoundingClientRect();
+          const newWidth = ((e.clientX - rect.left) / rect.width) * 100;
+          setLeftPanelWidth(Math.min(Math.max(newWidth, 20), 60)); // 20% to 60%
+        }
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDraggingVertical(false);
+    };
+
+    if (isDraggingVertical) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDraggingVertical]);
+
+  // Handle horizontal resize (console height)
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (isDraggingHorizontal) {
+        const container = document.getElementById('editor-container');
+        if (container) {
+          const rect = container.getBoundingClientRect();
+          const newHeight = rect.bottom - e.clientY;
+          setConsoleHeight(Math.min(Math.max(newHeight, 150), rect.height - 200)); // min 150px, max leaves 200px for editor
+        }
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDraggingHorizontal(false);
+    };
+
+    if (isDraggingHorizontal) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDraggingHorizontal]);
+
   const getDefaultStarterCode = (lang) => {
     if(lang === 'java') return `public class Main {\n    public static void main(String[] args) {\n        // Write your code here\n    }\n}`;
     if(lang === 'python') return `# Write your code here\nimport sys\n`;
@@ -77,7 +130,6 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems }) => {
   const handleLanguageChange = (e) => {
     const lang = e.target.value;
     setLanguage(lang);
-    // Try to get starter code from problem, else default
     setCode(problem.starterCode?.[lang] || getDefaultStarterCode(lang));
   };
 
@@ -111,12 +163,12 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems }) => {
     let allPassed = true;
     let runtimeError = null;
 
-    // Ensure we have test cases
     const testCases = problem.testCases || [];
 
     for (let i = 0; i < testCases.length; i++) {
         const testCase = testCases[i];
-        const apiResult = await executeCode(code, testCase.input);
+        // Pass the selected language to your execution API here if needed
+        const apiResult = await executeCode(code, testCase.input, language); 
 
         if (!apiResult || !apiResult.run) {
             runtimeError = "API Connection Failed";
@@ -128,7 +180,6 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems }) => {
         }
 
         const actualOutput = apiResult.run.stdout ? apiResult.run.stdout.trim() : "";
-        // Simple string comparison (watch out for hidden newlines in complex problems)
         const passed = actualOutput == testCase.expected?.trim();
 
         if (!passed) allPassed = false;
@@ -150,17 +201,23 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems }) => {
     } else {
         setTestResults(results);
         setFinalStatus(allPassed ? "Accepted" : "Wrong Answer");
-    }
-  };
 
- const handleSubmit = async () => {
+        // --- NEW: TRIGGER SUCCESS IF ALL PASSED ---
+        if (allPassed) {
+            // Pass Score (100), Code, and Language back to the parent
+            // Ensure 'language' is available in your component state
+            onComplete(100, code, language); 
+        }
+    }
+};
+
+  const handleSubmit = async () => {
     if (finalStatus !== "Accepted") {
         if(!confirm("Your code has not passed all test cases. Submit anyway?")) return;
     }
     
     const score = finalStatus === "Accepted" ? 100 : 0;
     
-    // CASE A: INTERVIEW MODE (Session ID exists)
     if (sessionId) {
       try {
         await supabase.from('mock_interview_sessions')
@@ -172,29 +229,42 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems }) => {
           .eq('id', sessionId);
         onComplete(score);
       } catch(err) { console.error(err); alert("Save failed"); }
-    } 
-    
-    // CASE B: PRACTICE MODE (No Session ID)
-    else {
-      // Just return the score to the parent (SolveProblemPage)
-      // The parent handles the DB updates for coins/progress
+    } else {
       onComplete(score);
     }
   };
 
+  const getDifficultyColor = (diff) => {
+    if(diff === 'Easy') return 'from-emerald-500 to-green-500';
+    if(diff === 'Medium') return 'from-yellow-500 to-orange-500';
+    return 'from-red-500 to-pink-500';
+  };
+
   return (
-    <div className="h-[calc(100vh-100px)] flex flex-col bg-[#0A0A0A] border border-gray-800 rounded-2xl overflow-hidden animate-in fade-in">
+    <div className="h-[calc(100vh-100px)] flex flex-col bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 rounded-3xl overflow-hidden shadow-2xl border border-slate-800/50">
       
-      {/* TOOLBAR */}
-      <div className="h-14 bg-[#111] border-b border-gray-800 flex items-center justify-between px-4">
-        <div className="flex items-center gap-4">
-            <h2 className="font-bold text-white flex items-center gap-2">
-                <CodeIcon size={18} className="text-[#FF4A1F]" /> Coding Round
-            </h2>
-            <div className="h-4 w-px bg-gray-700" />
-            <div className={`flex items-center gap-2 font-mono text-sm ${timeLeft < 300 ? 'text-red-500' : 'text-gray-400'}`}>
+      {/* ENHANCED TOOLBAR */}
+      <div className="h-16 bg-gradient-to-r from-slate-900/95 via-slate-800/95 to-slate-900/95 backdrop-blur-xl border-b border-slate-700/50 flex items-center justify-between px-6 shadow-lg">
+        <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl shadow-lg shadow-orange-500/20">
+                    <Code size={20} className="text-white" />
+                </div>
+                <div>
+                    <h2 className="font-bold text-white text-lg">Coding Challenge</h2>
+                    <p className="text-xs text-slate-400">Solve • Test • Submit</p>
+                </div>
+            </div>
+            
+            <div className="h-8 w-px bg-gradient-to-b from-transparent via-slate-700 to-transparent" />
+            
+            <div className={`flex items-center gap-2 px-4 py-2 rounded-xl font-mono text-sm font-bold backdrop-blur-sm transition-all duration-300 ${
+                timeLeft < 300 
+                    ? 'bg-red-500/20 text-red-400 border border-red-500/30 shadow-lg shadow-red-500/20 animate-pulse' 
+                    : 'bg-slate-800/50 text-slate-300 border border-slate-700/50'
+            }`}>
                 <Clock size={16} />
-                {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+                <span>{Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</span>
             </div>
         </div>
         
@@ -202,69 +272,220 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems }) => {
             <select 
                 value={language} 
                 onChange={handleLanguageChange}
-                className="bg-black text-gray-300 text-sm border border-gray-700 rounded-lg px-3 py-1.5 focus:border-[#FF4A1F] outline-none"
+                className="bg-slate-900 text-slate-300 text-sm border border-slate-700 rounded-xl px-4 py-2 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 outline-none transition-all cursor-pointer hover:bg-slate-800"
             >
-                <option value="java">Java</option>
-                <option value="python">Python</option>
-                <option value="cpp">C++</option>
+                <option value="java">☕ Java</option>
+                <option value="python">🐍 Python</option>
+                <option value="cpp">⚡ C++</option>
             </select>
-            <button onClick={handleRun} disabled={isRunning} className="flex items-center gap-2 px-4 py-1.5 bg-gray-800 hover:bg-gray-700 text-white text-sm rounded-lg border border-gray-700">
-               {isRunning ? <Cpu className="animate-spin" size={14} /> : <Play size={14} />} 
-               {isRunning ? "Running..." : "Run Code"}
+            
+            <button 
+                onClick={handleRun} 
+                disabled={isRunning} 
+                className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-slate-800 to-slate-700 hover:from-slate-700 hover:to-slate-600 text-white text-sm rounded-xl border border-slate-600 shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+               {isRunning ? <Cpu className="animate-spin" size={16} /> : <Play size={16} />} 
+               <span className="font-semibold">{isRunning ? "Running..." : "Run Code"}</span>
             </button>
-            <button onClick={handleSubmit} className="flex items-center gap-2 px-4 py-1.5 bg-[#FF4A1F] text-black font-bold text-sm rounded-lg">
-               Submit <Send size={14} />
+            
+            <button 
+                onClick={handleSubmit} 
+                className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white font-bold text-sm rounded-xl shadow-lg shadow-orange-500/30 transition-all duration-300 hover:scale-105 hover:shadow-xl"
+            >
+               <span>Submit</span>
+               <Send size={16} />
             </button>
         </div>
       </div>
 
       {/* SPLIT VIEW */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* LEFT: DESCRIPTION */}
-        <div className="w-1/3 border-r border-gray-800 p-6 overflow-y-auto bg-[#0A0A0A]">
-            <div className="flex items-center justify-between mb-4">
-                <h1 className="text-xl font-bold">{problem.title}</h1>
-                <span className="text-xs px-2 py-1 rounded border border-green-800 text-green-500 bg-green-900/10">{problem.difficulty || "Medium"}</span>
-            </div>
-            <p className="text-gray-400 text-sm leading-relaxed mb-6 whitespace-pre-wrap">{problem.description}</p>
-
-            <h3 className="text-sm font-bold text-white mb-3 uppercase tracking-widest text-xs">Sample Case</h3>
-            <div className="bg-[#111] p-4 rounded-lg border border-gray-800 font-mono text-sm mb-6">
-                <div className="text-gray-500 text-xs mb-1">Input:</div>
-                <div className="text-white mb-3">{problem.testCases?.[0]?.input || "N/A"}</div>
-                <div className="text-gray-500 text-xs mb-1">Expected:</div>
-                <div className="text-[#FF4A1F]">{problem.testCases?.[0]?.expected || "N/A"}</div>
-            </div>
-
-            {finalStatus && (
-                <div className={`mt-4 p-4 rounded-xl border ${finalStatus === "Accepted" ? "bg-green-900/20 border-green-500/50" : "bg-red-900/20 border-red-500/50"}`}>
-                    <span className={`font-bold text-lg ${finalStatus === "Accepted" ? "text-green-500" : "text-red-500"}`}>{finalStatus}</span>
+      <div id="split-container" className="flex-1 flex overflow-hidden">
+        
+        {/* LEFT: ENHANCED DESCRIPTION PANEL */}
+        <div 
+          className="border-r border-slate-800/50 p-6 overflow-y-auto bg-gradient-to-br from-slate-900/50 to-slate-800/50 backdrop-blur-sm"
+          style={{ width: `${leftPanelWidth}%` }}
+        >
+            <div className="space-y-6">
+                {/* Problem Header */}
+                <div className="bg-gradient-to-r from-slate-800/80 to-slate-900/80 backdrop-blur-xl p-6 rounded-2xl border border-slate-700/50 shadow-xl">
+                    <div className="flex items-start justify-between mb-3">
+                        <h1 className="text-2xl font-bold text-white leading-tight flex-1">{problem.title}</h1>
+                        <span className={`text-xs px-3 py-1.5 rounded-full border font-semibold bg-gradient-to-r ${getDifficultyColor(problem.difficulty)} bg-clip-text text-transparent border-slate-600`}>
+                            {problem.difficulty || "Medium"}
+                        </span>
+                    </div>
+                    <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">{problem.description}</p>
                 </div>
-            )}
+
+                {/* Sample Test Case */}
+                <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                        <Sparkles size={16} className="text-orange-400"/>
+                        <h3 className="text-sm font-bold text-white uppercase tracking-wider">Sample Test Case</h3>
+                    </div>
+                    <div className="bg-slate-950/50 backdrop-blur-xl p-5 rounded-2xl border border-slate-700/50 font-mono text-sm shadow-xl">
+                        <div className="space-y-4">
+                            <div>
+                                <div className="text-slate-500 text-xs mb-2 font-semibold uppercase tracking-wider">Input:</div>
+                                <div className="text-emerald-400 bg-slate-900/50 px-4 py-2 rounded-lg border border-slate-800">
+                                    {problem.testCases?.[0]?.input || "N/A"}
+                                </div>
+                            </div>
+                            <div>
+                                <div className="text-slate-500 text-xs mb-2 font-semibold uppercase tracking-wider">Expected Output:</div>
+                                <div className="text-orange-400 bg-slate-900/50 px-4 py-2 rounded-lg border border-slate-800">
+                                    {problem.testCases?.[0]?.expected || "N/A"}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Status Badge */}
+                {finalStatus && (
+                    <div className={`p-5 rounded-2xl border-2 shadow-2xl backdrop-blur-xl transition-all duration-500 ${
+                        finalStatus === "Accepted" 
+                            ? "bg-gradient-to-br from-emerald-500/20 to-green-500/20 border-emerald-500/50 shadow-emerald-500/20" 
+                            : finalStatus === "Error"
+                            ? "bg-gradient-to-br from-orange-500/20 to-red-500/20 border-orange-500/50 shadow-orange-500/20"
+                            : "bg-gradient-to-br from-red-500/20 to-pink-500/20 border-red-500/50 shadow-red-500/20"
+                    }`}>
+                        <div className="flex items-center gap-3">
+                            {finalStatus === "Accepted" ? (
+                                <CheckCircle className="text-emerald-400" size={28}/>
+                            ) : (
+                                <XCircle className="text-red-400" size={28}/>
+                            )}
+                            <div>
+                                <span className={`font-bold text-xl ${
+                                    finalStatus === "Accepted" ? "text-emerald-400" : "text-red-400"
+                                }`}>
+                                    {finalStatus}
+                                </span>
+                                <p className="text-xs text-slate-400 mt-1">
+                                    {finalStatus === "Accepted" 
+                                        ? "All test cases passed! 🎉" 
+                                        : finalStatus === "Error"
+                                        ? "Runtime error detected"
+                                        : "Some test cases failed"}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
 
-        {/* RIGHT: EDITOR */}
-        <div className="flex-1 flex flex-col bg-[#111]">
+        {/* VERTICAL RESIZER */}
+        <div 
+          className="w-1 bg-slate-800/50 hover:bg-orange-500/50 cursor-col-resize transition-colors relative group"
+          onMouseDown={() => setIsDraggingVertical(true)}
+        >
+          <div className="absolute inset-y-0 -left-1 -right-1 flex items-center justify-center">
+            <div className="w-1 h-12 bg-slate-700 group-hover:bg-orange-500 rounded-full transition-colors shadow-lg"></div>
+          </div>
+        </div>
+
+        {/* RIGHT: ENHANCED CODE EDITOR */}
+        <div id="editor-container" className="flex-1 flex flex-col bg-slate-950/90">
+            {/* Editor Header */}
+            <div className="h-12 bg-slate-900/50 border-b border-slate-800/50 flex items-center px-4 gap-3">
+                <FileCode size={16} className="text-slate-400"/>
+                <span className="text-sm text-slate-400 font-mono">{LANGUAGE_VERSIONS[language].file}</span>
+                <div className="flex-1"/>
+                <div className="flex gap-1">
+                    <div className="w-3 h-3 rounded-full bg-red-500/60"></div>
+                    <div className="w-3 h-3 rounded-full bg-yellow-500/60"></div>
+                    <div className="w-3 h-3 rounded-full bg-green-500/60"></div>
+                </div>
+            </div>
+
+            {/* Code Editor */}
             <textarea
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                className="flex-1 w-full bg-[#111] text-gray-300 font-mono text-sm p-4 outline-none resize-none"
-                placeholder="// Type your solution here..."
+                className="flex-1 w-full bg-slate-950 text-slate-200 font-mono text-sm p-6 outline-none resize-none leading-relaxed"
+                placeholder="// Write your solution here..."
                 spellCheck="false"
+                style={{
+                    lineHeight: '1.6',
+                    tabSize: 4
+                }}
             />
-            {/* CONSOLE */}
-            <div className="h-48 border-t border-gray-800 bg-black flex flex-col">
-                <div className="h-8 bg-[#0A0A0A] border-b border-gray-800 flex items-center px-4 gap-2 text-xs text-gray-500 uppercase">
-                     <Terminal size={12} /> Console
-                </div>
-                <div className="flex-1 p-4 overflow-y-auto font-mono text-sm text-gray-400">
-                    {isRunning ? "Executing..." : 
-                     finalStatus === "Error" ? <span className="text-red-400">{consoleOutput}</span> :
-                     testResults.map((res, i) => (
-                        <div key={i} className={res.passed ? "text-green-500" : "text-red-500"}>
-                           Test Case #{i+1}: {res.passed ? "PASSED" : `FAILED (Expected: ${res.expected}, Got: ${res.actual})`}
+            
+            {/* HORIZONTAL RESIZER */}
+            <div 
+              className="h-1 bg-slate-800/50 hover:bg-orange-500/50 cursor-row-resize transition-colors relative group"
+              onMouseDown={() => setIsDraggingHorizontal(true)}
+            >
+              <div className="absolute inset-x-0 -top-1 -bottom-1 flex items-center justify-center">
+                <div className="h-1 w-12 bg-slate-700 group-hover:bg-orange-500 rounded-full transition-colors shadow-lg"></div>
+              </div>
+            </div>
+            
+            {/* ENHANCED CONSOLE */}
+            <div 
+              className="border-t border-slate-800/50 bg-black flex flex-col shadow-2xl"
+              style={{ height: `${consoleHeight}px` }}
+            >
+                <div className="h-10 bg-slate-900/80 border-b border-slate-800/50 flex items-center px-4 gap-3">
+                    <Terminal size={14} className="text-slate-400"/>
+                    <span className="text-xs text-slate-400 uppercase font-semibold tracking-wider">Console Output</span>
+                    {isRunning && (
+                        <div className="flex gap-1 ml-2">
+                            <div className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse"></div>
+                            <div className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
+                            <div className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
                         </div>
-                     ))}
+                    )}
+                </div>
+                <div className="flex-1 p-4 overflow-y-auto font-mono text-sm">
+                    {isRunning ? (
+                        <div className="flex items-center gap-3 text-slate-400">
+                            <Cpu className="animate-spin" size={16}/>
+                            <span>Executing code...</span>
+                        </div>
+                    ) : finalStatus === "Error" ? (
+                        <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-red-400 font-semibold">
+                                <AlertTriangle size={16}/>
+                                Runtime Error
+                            </div>
+                            <pre className="text-red-300 bg-red-900/10 p-3 rounded-lg border border-red-800/30 text-xs overflow-x-auto">
+                                {consoleOutput}
+                            </pre>
+                        </div>
+                    ) : testResults.length > 0 ? (
+                        <div className="space-y-3">
+                            {testResults.map((res, i) => (
+                                <div 
+                                    key={i} 
+                                    className={`p-3 rounded-xl border backdrop-blur-sm transition-all duration-300 ${
+                                        res.passed 
+                                            ? 'bg-emerald-900/20 border-emerald-700/30 text-emerald-400' 
+                                            : 'bg-red-900/20 border-red-700/30 text-red-400'
+                                    }`}
+                                >
+                                    <div className="flex items-center gap-2 mb-2">
+                                        {res.passed ? <CheckCircle size={16}/> : <XCircle size={16}/>}
+                                        <span className="font-bold">Test Case #{i + 1}</span>
+                                    </div>
+                                    {!res.passed && (
+                                        <div className="text-xs space-y-1 ml-6 text-slate-300">
+                                            <div><span className="text-slate-500">Expected:</span> {res.expected}</div>
+                                            <div><span className="text-slate-500">Got:</span> {res.actual}</div>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-slate-500 text-sm flex items-center gap-2">
+                            <Zap size={16}/>
+                            <span>Ready to run your code. Click "Run Code" to test.</span>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

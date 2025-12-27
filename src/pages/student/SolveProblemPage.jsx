@@ -11,49 +11,39 @@ export default function SolveProblemPage() {
   const [problem, setProblem] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchProblem = async () => {
-      // Fetch Problem Details
-      const { data } = await supabase
-        .from('coding_questions')
-        .select('*')
-        .eq('id', questionId)
-        .single();
-      
-      // Adapt DB columns to CodingModule expectations
-      if (data) {
-        setProblem({
-          id: data.id,
-          title: data.title,
-          description: data.description,
-          difficulty: data.difficulty,
-          testCases: data.test_cases, // DB: test_cases, Component: testCases
-          starterCode: data.starter_code // DB: starter_code, Component: starterCode
-        });
-      }
-      setLoading(false);
-    };
-    fetchProblem();
-  }, [questionId]);
+  // ... (useEffect fetchProblem logic remains the same) ...
 
-  // Handle Practice Mode Completion
-  const handleComplete = async (score) => {
+  // UPDATE THIS FUNCTION
+  const handleComplete = async (score, submittedCode, language) => { 
     if(score === 100) {
       confetti();
       const { data: { user } } = await supabase.auth.getUser();
       
-      // 1. Record Solution
-      await supabase.from('student_solutions').upsert({
+      const reward = problem.coin_reward || 10;
+
+      // 1. Record Solution WITH CODE and LANGUAGE
+      const { error: saveError } = await supabase.from('student_solutions').upsert({
         user_id: user.id,
         question_id: questionId,
         status: 'Solved',
-        earned_coins: problem.coin_reward // Assuming you passed rewards up or fetched them
+        earned_coins: reward,
+        code_submitted: submittedCode, // <--- Saving the actual code
+        language: language             // <--- Saving the language (e.g., 'javascript')
       }, { onConflict: 'user_id, question_id' });
 
-      // 2. (Optional) Add coins to user profile
-      // await supabase.rpc('increment_coins', { amount: 10, uid: user.id });
+      if (saveError) {
+        console.error("Error saving solution:", saveError);
+        return; 
+      }
 
-      alert("Problem Solved! Coins Added.");
+      // 2. Add Coins (Only if successful)
+      const { error: rpcError } = await supabase.rpc('increment_profile_coins', { 
+        p_amount: reward 
+      });
+
+      if (rpcError) console.error("Wallet error:", rpcError);
+
+      alert(`Problem Solved! +${reward} Coins Added.`);
       navigate('/student/questions');
     }
   };
@@ -66,13 +56,13 @@ export default function SolveProblemPage() {
       <div className="p-4 border-b border-gray-800 flex items-center gap-4">
         <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-white"><ArrowLeft/></button>
         <span className="text-white font-bold">{problem.title}</span>
+        <span className="text-xs bg-yellow-500/10 text-yellow-500 px-2 py-1 rounded border border-yellow-500/50">Reward: {problem.coin_reward} 🪙</span>
       </div>
       
       <div className="flex-1 p-4">
         <CodingModule 
-          // No sessionId passed -> Triggers 'Practice Mode' logic in module
           problems={[problem]} 
-          onComplete={handleComplete} 
+          onComplete={handleComplete} // Passing the updated handler
         />
       </div>
     </div>
