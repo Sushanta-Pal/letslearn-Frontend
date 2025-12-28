@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { 
   Play, Send, CheckCircle, XCircle, 
   Code, Cpu, Clock, Terminal, AlertTriangle, Sparkles, Zap, FileCode 
 } from "lucide-react";
 import { supabase } from "../../supabaseClient";
 
-// --- FALLBACK DATA (Keep this just in case no questions are passed) ---
+// --- FALLBACK DATA ---
 const FALLBACK_PROBLEMS = [
   {
     id: "fallback-1",
@@ -29,9 +29,19 @@ const LANGUAGE_VERSIONS = {
 
 const CodingModule = ({ user, sessionId, onComplete, onCancel, problems }) => {
   
-  const availableProblems = (problems && problems.length > 0) ? problems : FALLBACK_PROBLEMS;
+  // 1. NORMALIZE DATA (Fixes the test_cases vs testCases mismatch)
+  // We use useMemo to prevent re-renders, merging props to ensure camelCase keys exist.
+  const activeProblem = useMemo(() => {
+    const raw = (problems && problems.length > 0) ? problems[0] : FALLBACK_PROBLEMS[0];
+    return {
+        ...raw,
+        // Check both 'testCases' (JSON) and 'test_cases' (DB)
+        testCases: raw.testCases || raw.test_cases || [],
+        // Check both 'starterCode' (JSON) and 'starter_code' (DB)
+        starterCode: raw.starterCode || raw.starter_code || {}
+    };
+  }, [problems]);
 
-  const [problem, setProblem] = useState(availableProblems[0]);
   const [language, setLanguage] = useState("java");
   const [code, setCode] = useState("");
   
@@ -42,19 +52,20 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems }) => {
 
   const [timeLeft, setTimeLeft] = useState(45 * 60);
   
-  // Resizable panels state
-  const [leftPanelWidth, setLeftPanelWidth] = useState(40); // percentage
-  const [consoleHeight, setConsoleHeight] = useState(224); // pixels
+  // Resizable panels
+  const [leftPanelWidth, setLeftPanelWidth] = useState(40);
+  const [consoleHeight, setConsoleHeight] = useState(224);
   const [isDraggingVertical, setIsDraggingVertical] = useState(false);
   const [isDraggingHorizontal, setIsDraggingHorizontal] = useState(false); 
 
+  // Load starter code when problem or language changes
   useEffect(() => {
-    const activeProblem = availableProblems[0];
-    setProblem(activeProblem);
-    
     const initialCode = activeProblem.starterCode?.[language] || getDefaultStarterCode(language);
     setCode(initialCode);
+  }, [activeProblem, language]);
 
+  // Timer
+  useEffect(() => {
     const timer = setInterval(() => {
       setTimeLeft(prev => {
         if(prev <= 1) { clearInterval(timer); return 0; }
@@ -62,9 +73,9 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems }) => {
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, [availableProblems]);
+  }, []);
 
-  // Handle vertical resize (left panel width)
+  // Drag Handlers
   useEffect(() => {
     const handleMouseMove = (e) => {
       if (isDraggingVertical) {
@@ -72,44 +83,25 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems }) => {
         if (container) {
           const rect = container.getBoundingClientRect();
           const newWidth = ((e.clientX - rect.left) / rect.width) * 100;
-          setLeftPanelWidth(Math.min(Math.max(newWidth, 20), 60)); // 20% to 60%
+          setLeftPanelWidth(Math.min(Math.max(newWidth, 20), 60)); 
+        }
+      }
+      if (isDraggingHorizontal) {
+        const container = document.getElementById('editor-container');
+        if (container) {
+          const rect = container.getBoundingClientRect();
+          const newHeight = rect.bottom - e.clientY;
+          setConsoleHeight(Math.min(Math.max(newHeight, 150), rect.height - 200)); 
         }
       }
     };
 
     const handleMouseUp = () => {
       setIsDraggingVertical(false);
-    };
-
-    if (isDraggingVertical) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-    }
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isDraggingVertical]);
-
-  // Handle horizontal resize (console height)
-  useEffect(() => {
-    const handleMouseMove = (e) => {
-      if (isDraggingHorizontal) {
-        const container = document.getElementById('editor-container');
-        if (container) {
-          const rect = container.getBoundingClientRect();
-          const newHeight = rect.bottom - e.clientY;
-          setConsoleHeight(Math.min(Math.max(newHeight, 150), rect.height - 200)); // min 150px, max leaves 200px for editor
-        }
-      }
-    };
-
-    const handleMouseUp = () => {
       setIsDraggingHorizontal(false);
     };
 
-    if (isDraggingHorizontal) {
+    if (isDraggingVertical || isDraggingHorizontal) {
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
     }
@@ -118,7 +110,7 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems }) => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDraggingHorizontal]);
+  }, [isDraggingVertical, isDraggingHorizontal]);
 
   const getDefaultStarterCode = (lang) => {
     if(lang === 'java') return `public class Main {\n    public static void main(String[] args) {\n        // Write your code here\n    }\n}`;
@@ -130,7 +122,7 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems }) => {
   const handleLanguageChange = (e) => {
     const lang = e.target.value;
     setLanguage(lang);
-    setCode(problem.starterCode?.[lang] || getDefaultStarterCode(lang));
+    setCode(activeProblem.starterCode?.[lang] || getDefaultStarterCode(lang));
   };
 
   const executeCode = async (codeToRun, inputData) => {
@@ -154,6 +146,12 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems }) => {
   };
 
   const handleRun = async () => {
+    // 2. ERROR HANDLING FOR NO TEST CASES
+    if (!activeProblem.testCases || activeProblem.testCases.length === 0) {
+        alert("This problem has no test cases configured. Cannot run tests.");
+        return;
+    }
+
     setIsRunning(true);
     setConsoleOutput(null);
     setTestResults([]);
@@ -163,12 +161,12 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems }) => {
     let allPassed = true;
     let runtimeError = null;
 
-    const testCases = problem.testCases || [];
+    // Use normalized testCases
+    const testCases = activeProblem.testCases;
 
     for (let i = 0; i < testCases.length; i++) {
         const testCase = testCases[i];
-        // Pass the selected language to your execution API here if needed
-        const apiResult = await executeCode(code, testCase.input, language); 
+        const apiResult = await executeCode(code, testCase.input); 
 
         if (!apiResult || !apiResult.run) {
             runtimeError = "API Connection Failed";
@@ -180,7 +178,8 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems }) => {
         }
 
         const actualOutput = apiResult.run.stdout ? apiResult.run.stdout.trim() : "";
-        const passed = actualOutput == testCase.expected?.trim();
+        const expectedOutput = testCase.expected ? testCase.expected.trim() : "";
+        const passed = actualOutput === expectedOutput;
 
         if (!passed) allPassed = false;
 
@@ -201,15 +200,8 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems }) => {
     } else {
         setTestResults(results);
         setFinalStatus(allPassed ? "Accepted" : "Wrong Answer");
-
-        // --- NEW: TRIGGER SUCCESS IF ALL PASSED ---
-        if (allPassed) {
-            // Pass Score (100), Code, and Language back to the parent
-            // Ensure 'language' is available in your component state
-            onComplete(100, code, language); 
-        }
     }
-};
+  };
 
   const handleSubmit = async () => {
     if (finalStatus !== "Accepted") {
@@ -224,13 +216,17 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems }) => {
           .update({
             coding_score: score,
             status: 'completed',
-            coding_data: { problemId: problem.id, code, language, passed: score === 100 }
+            coding_data: { problemId: activeProblem.id, code, language, passed: score === 100 }
           })
           .eq('id', sessionId);
+        
         onComplete(score);
-      } catch(err) { console.error(err); alert("Save failed"); }
+      } catch(err) { 
+        console.error(err); 
+        alert("Save failed"); 
+      }
     } else {
-      onComplete(score);
+      onComplete(score, code, language); 
     }
   };
 
@@ -243,7 +239,7 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems }) => {
   return (
     <div className="h-[calc(100vh-100px)] flex flex-col bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 rounded-3xl overflow-hidden shadow-2xl border border-slate-800/50">
       
-      {/* ENHANCED TOOLBAR */}
+      {/* TOOLBAR */}
       <div className="h-16 bg-gradient-to-r from-slate-900/95 via-slate-800/95 to-slate-900/95 backdrop-blur-xl border-b border-slate-700/50 flex items-center justify-between px-6 shadow-lg">
         <div className="flex items-center gap-6">
             <div className="flex items-center gap-3">
@@ -301,21 +297,20 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems }) => {
       {/* SPLIT VIEW */}
       <div id="split-container" className="flex-1 flex overflow-hidden">
         
-        {/* LEFT: ENHANCED DESCRIPTION PANEL */}
+        {/* LEFT: DESCRIPTION PANEL */}
         <div 
           className="border-r border-slate-800/50 p-6 overflow-y-auto bg-gradient-to-br from-slate-900/50 to-slate-800/50 backdrop-blur-sm"
           style={{ width: `${leftPanelWidth}%` }}
         >
             <div className="space-y-6">
-                {/* Problem Header */}
                 <div className="bg-gradient-to-r from-slate-800/80 to-slate-900/80 backdrop-blur-xl p-6 rounded-2xl border border-slate-700/50 shadow-xl">
                     <div className="flex items-start justify-between mb-3">
-                        <h1 className="text-2xl font-bold text-white leading-tight flex-1">{problem.title}</h1>
-                        <span className={`text-xs px-3 py-1.5 rounded-full border font-semibold bg-gradient-to-r ${getDifficultyColor(problem.difficulty)} bg-clip-text text-transparent border-slate-600`}>
-                            {problem.difficulty || "Medium"}
+                        <h1 className="text-2xl font-bold text-white leading-tight flex-1">{activeProblem.title}</h1>
+                        <span className={`text-xs px-3 py-1.5 rounded-full border font-semibold bg-gradient-to-r ${getDifficultyColor(activeProblem.difficulty)} bg-clip-text text-transparent border-slate-600`}>
+                            {activeProblem.difficulty || "Medium"}
                         </span>
                     </div>
-                    <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">{problem.description}</p>
+                    <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">{activeProblem.description}</p>
                 </div>
 
                 {/* Sample Test Case */}
@@ -329,13 +324,14 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems }) => {
                             <div>
                                 <div className="text-slate-500 text-xs mb-2 font-semibold uppercase tracking-wider">Input:</div>
                                 <div className="text-emerald-400 bg-slate-900/50 px-4 py-2 rounded-lg border border-slate-800">
-                                    {problem.testCases?.[0]?.input || "N/A"}
+                                    {/* 3. VISUAL FIX: Use normalized testCases */}
+                                    {activeProblem.testCases?.[0]?.input || "N/A"}
                                 </div>
                             </div>
                             <div>
                                 <div className="text-slate-500 text-xs mb-2 font-semibold uppercase tracking-wider">Expected Output:</div>
                                 <div className="text-orange-400 bg-slate-900/50 px-4 py-2 rounded-lg border border-slate-800">
-                                    {problem.testCases?.[0]?.expected || "N/A"}
+                                    {activeProblem.testCases?.[0]?.expected || "N/A"}
                                 </div>
                             </div>
                         </div>
@@ -365,7 +361,7 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems }) => {
                                 </span>
                                 <p className="text-xs text-slate-400 mt-1">
                                     {finalStatus === "Accepted" 
-                                        ? "All test cases passed! 🎉" 
+                                        ? "All test cases passed! 🎉 Click Submit to finish." 
                                         : finalStatus === "Error"
                                         ? "Runtime error detected"
                                         : "Some test cases failed"}
@@ -377,7 +373,7 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems }) => {
             </div>
         </div>
 
-        {/* VERTICAL RESIZER */}
+        {/* RESIZER */}
         <div 
           className="w-1 bg-slate-800/50 hover:bg-orange-500/50 cursor-col-resize transition-colors relative group"
           onMouseDown={() => setIsDraggingVertical(true)}
@@ -387,9 +383,8 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems }) => {
           </div>
         </div>
 
-        {/* RIGHT: ENHANCED CODE EDITOR */}
+        {/* RIGHT: EDITOR */}
         <div id="editor-container" className="flex-1 flex flex-col bg-slate-950/90">
-            {/* Editor Header */}
             <div className="h-12 bg-slate-900/50 border-b border-slate-800/50 flex items-center px-4 gap-3">
                 <FileCode size={16} className="text-slate-400"/>
                 <span className="text-sm text-slate-400 font-mono">{LANGUAGE_VERSIONS[language].file}</span>
@@ -401,20 +396,15 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems }) => {
                 </div>
             </div>
 
-            {/* Code Editor */}
             <textarea
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 className="flex-1 w-full bg-slate-950 text-slate-200 font-mono text-sm p-6 outline-none resize-none leading-relaxed"
                 placeholder="// Write your solution here..."
                 spellCheck="false"
-                style={{
-                    lineHeight: '1.6',
-                    tabSize: 4
-                }}
+                style={{ lineHeight: '1.6', tabSize: 4 }}
             />
             
-            {/* HORIZONTAL RESIZER */}
             <div 
               className="h-1 bg-slate-800/50 hover:bg-orange-500/50 cursor-row-resize transition-colors relative group"
               onMouseDown={() => setIsDraggingHorizontal(true)}
@@ -424,7 +414,6 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems }) => {
               </div>
             </div>
             
-            {/* ENHANCED CONSOLE */}
             <div 
               className="border-t border-slate-800/50 bg-black flex flex-col shadow-2xl"
               style={{ height: `${consoleHeight}px` }}
@@ -432,13 +421,6 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems }) => {
                 <div className="h-10 bg-slate-900/80 border-b border-slate-800/50 flex items-center px-4 gap-3">
                     <Terminal size={14} className="text-slate-400"/>
                     <span className="text-xs text-slate-400 uppercase font-semibold tracking-wider">Console Output</span>
-                    {isRunning && (
-                        <div className="flex gap-1 ml-2">
-                            <div className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse"></div>
-                            <div className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
-                            <div className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
-                        </div>
-                    )}
                 </div>
                 <div className="flex-1 p-4 overflow-y-auto font-mono text-sm">
                     {isRunning ? (

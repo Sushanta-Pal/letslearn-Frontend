@@ -68,34 +68,32 @@ const InternshipDashboard = () => {
         .select('metadata, technical_score, coding_score, status')
         .eq('user_id', user.id)
         .eq('status', 'completed');
+function resolveUIState({ submission, qualifier }) {
+  if (submission?.status === 'completed') return 'DONE';
+  if (submission?.status === 'qualified') return 'OFFER';
+  if (submission?.is_paid) return 'WORK';
+
+  if (qualifier) {
+    const passed =
+      qualifier.technical_score >= 60 &&
+      qualifier.coding_score >= 60;
+    return passed ? 'OFFER' : 'REJECTED';
+  }
+
+  return 'APPLY';
+}
 
       // --- 4. MERGE LOGIC (Determine Button State: APPLY / OFFER / WORK) ---
-      const merged = projData.map(p => {
-        // Find the specific submission for THIS project
-        const mySubmission = submissions?.find(s => s.project_id === p.id);
+     const merged = projData.map(p => {
+  const submission = submissions?.find(s => s.project_id === p.id);
+  const qualifier = mockData?.find(m => m.metadata?.set_id === p.qualifying_set_id);
 
-        // Default State
-        let uiState = 'APPLY'; 
+  return {
+    ...p,
+    uiState: resolveUIState({ submission, qualifier })
+  };
+});
 
-        // PRIORITY 1: If they paid, they are HIRED.
-        if (mySubmission?.is_paid === true) {
-          uiState = 'WORK';
-        } 
-        // PRIORITY 2: If they qualified but didn't pay yet.
-        else if (mySubmission?.status === 'qualified') {
-          uiState = 'OFFER';
-        }
-        // PRIORITY 3: Check Mock Interview results if no submission exists yet
-        else {
-          const qualifier = mockData?.find(m => m.metadata?.set_id === p.qualifying_set_id);
-          const passedQualifier = qualifier && qualifier.technical_score >= 60 && qualifier.coding_score >= 60;
-          
-          if (passedQualifier) uiState = 'OFFER';
-          else if (qualifier && !passedQualifier) uiState = 'REJECTED';
-        }
-
-        return { ...p, uiState };
-      });
 
       setProjects(merged);
 
@@ -247,21 +245,21 @@ const InternshipDashboard = () => {
                      </div>
                   </div>
 
-                  <button 
-                     onClick={() => handleCardClick(job)}
-                     disabled={job.uiState === 'REJECTED'}
-                     className={`w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${
-                        job.uiState === 'WORK' ? 'bg-slate-800 text-white hover:bg-slate-700' :
-                        job.uiState === 'OFFER' ? 'bg-emerald-500 text-black hover:bg-emerald-400' :
-                        job.uiState === 'REJECTED' ? 'bg-slate-800 text-slate-500 cursor-not-allowed' :
-                        'bg-white text-indigo-950 hover:bg-indigo-50'
-                     }`}
-                  >
-                     {job.uiState === 'WORK' && "Open Workspace"}
-                     {job.uiState === 'OFFER' && "Accept Offer"}
-                     {job.uiState === 'REJECTED' && "Not Qualified"}
-                     {job.uiState === 'APPLY' && <>Apply Now <ArrowRight size={16}/></>}
-                  </button>
+                 <button 
+    onClick={() => handleCardClick(job)}
+    disabled={job.uiState === 'REJECTED' || job.uiState === 'DONE'}
+    className={`w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${
+        job.uiState === 'DONE' ? 'bg-green-900/20 text-green-500 border border-green-500/50 cursor-default' : // Green for Done
+        job.uiState === 'WORK' ? 'bg-slate-800 text-white hover:bg-slate-700' :
+        job.uiState === 'OFFER' ? 'bg-emerald-500 text-black hover:bg-emerald-400' :
+        'bg-white text-indigo-950 hover:bg-indigo-50'
+    }`}
+>
+    {job.uiState === 'DONE' && <><CheckCircle size={16}/> Internship Completed</>}
+    {job.uiState === 'WORK' && "Open Workspace"}
+    {job.uiState === 'OFFER' && "Accept Offer"}
+    {job.uiState === 'APPLY' && <>Apply Now <ArrowRight size={16}/></>}
+</button>
                 </div>
               ))}
             </div>

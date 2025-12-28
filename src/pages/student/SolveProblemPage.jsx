@@ -11,9 +11,33 @@ export default function SolveProblemPage() {
   const [problem, setProblem] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // ... (useEffect fetchProblem logic remains the same) ...
+  // --- RESTORED FETCH LOGIC ---
+  useEffect(() => {
+    const fetchProblem = async () => {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('coding_questions') // Ensure this matches your table name
+          .select('*')
+          .eq('id', questionId)
+          .single();
 
-  // UPDATE THIS FUNCTION
+        if (error) throw error;
+        setProblem(data);
+      } catch (err) {
+        console.error("Error loading problem:", err);
+        alert("Problem not found or deleted.");
+        navigate('/student/questions'); // Go back if error
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (questionId) {
+      fetchProblem();
+    }
+  }, [questionId, navigate]);
+
   const handleComplete = async (score, submittedCode, language) => { 
     if(score === 100) {
       confetti();
@@ -27,8 +51,8 @@ export default function SolveProblemPage() {
         question_id: questionId,
         status: 'Solved',
         earned_coins: reward,
-        code_submitted: submittedCode, // <--- Saving the actual code
-        language: language             // <--- Saving the language (e.g., 'javascript')
+        code_submitted: submittedCode, // Saves the actual code
+        language: language             // Saves the language (e.g., 'java')
       }, { onConflict: 'user_id, question_id' });
 
       if (saveError) {
@@ -36,7 +60,7 @@ export default function SolveProblemPage() {
         return; 
       }
 
-      // 2. Add Coins (Only if successful)
+      // 2. Add Coins (RPC call)
       const { error: rpcError } = await supabase.rpc('increment_profile_coins', { 
         p_amount: reward 
       });
@@ -45,24 +69,36 @@ export default function SolveProblemPage() {
 
       alert(`Problem Solved! +${reward} Coins Added.`);
       navigate('/student/questions');
+    } else {
+        alert("Keep trying! You need to pass all test cases.");
     }
   };
 
-  if(loading) return <div className="h-screen bg-[#060606] flex items-center justify-center text-white"><Loader2 className="animate-spin"/></div>;
+  if(loading) return (
+    <div className="h-screen bg-[#060606] flex items-center justify-center text-white">
+        <Loader2 className="animate-spin text-[#FF4A1F]" size={40}/>
+    </div>
+  );
+  
   if(!problem) return <div className="text-white p-10">Problem not found.</div>;
 
   return (
     <div className="bg-[#060606] min-h-screen flex flex-col">
       <div className="p-4 border-b border-gray-800 flex items-center gap-4">
-        <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-white"><ArrowLeft/></button>
+        <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-white transition-colors">
+            <ArrowLeft/>
+        </button>
         <span className="text-white font-bold">{problem.title}</span>
-        <span className="text-xs bg-yellow-500/10 text-yellow-500 px-2 py-1 rounded border border-yellow-500/50">Reward: {problem.coin_reward} 🪙</span>
+        <span className="text-xs bg-yellow-500/10 text-yellow-500 px-2 py-1 rounded border border-yellow-500/50">
+            Reward: {problem.coin_reward} 🪙
+        </span>
       </div>
       
       <div className="flex-1 p-4">
+        {/* Pass the problem as an array since CodingModule expects a list */}
         <CodingModule 
           problems={[problem]} 
-          onComplete={handleComplete} // Passing the updated handler
+          onComplete={handleComplete} 
         />
       </div>
     </div>
