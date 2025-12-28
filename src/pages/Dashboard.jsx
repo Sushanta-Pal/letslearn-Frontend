@@ -1,16 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { 
-  Code, Briefcase, Mic, CheckCircle, ArrowRight, Layers, 
-  Cpu, Globe, Shield, Zap 
+  Code, Briefcase, Mic, CheckCircle, ArrowRight, 
+  Globe, Shield, Zap 
 } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import MobileNav from "@/components/ui/MobileNav";
 import Loader from "../components/Loader";
+import dashboardShot from '../assets/dashboard-screenshot.png'; 
 
-// You can keep your existing specialized components if they are complex
-// For this example, I will inline simpler versions or assume standard imports exist.
-// If TrustedBy, PricingCard etc are complex, ensure they are imported.
 import TrustedBy from "../components/TrustedBy"; 
 import PricingCard from "../components/PricingCard";
 
@@ -58,8 +56,8 @@ export default function FoxBirdLanding() {
       transition={{ duration: 0.5 }}
     >
       {/* --- NAVBAR --- */}
-      <header className="sticky top-0 z-50 backdrop-blur-md bg-black/60 border-b border-white/5">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+      <header className="sticky top-0 z-50 backdrop-blur-md bg-black/80 border-b border-white/5">
+        <div className="max-w-[1400px] mx-auto px-6 py-4 flex items-center justify-between">
           <a href="/" className="flex items-center gap-2 group">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FF4A1F] to-[#FF8C69] flex items-center justify-center font-bold text-black group-hover:rotate-12 transition-transform">
               FB
@@ -112,11 +110,11 @@ export default function FoxBirdLanding() {
       </header>
 
       {/* --- HERO SECTION --- */}
-      <section className="relative pt-20 pb-32 overflow-hidden">
+      <section className="relative pt-16 pb-20 overflow-hidden">
         {/* Background Gradients */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-[#FF4A1F]/10 rounded-full blur-[120px] -z-10" />
         
-        <div className="max-w-7xl mx-auto px-6 text-center">
+        <div className="max-w-[1400px] mx-auto px-6 text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-[#FF4A1F] mb-6">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#FF4A1F] opacity-75"></span>
@@ -135,7 +133,7 @@ export default function FoxBirdLanding() {
             get code reviews from senior bots, and earn verified certificates.
           </p>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
             <a 
               href={isLoggedIn ? "/profile" : "/signup"}
               className="px-8 py-4 bg-white text-black rounded-full font-bold text-lg hover:bg-gray-100 transition-all flex items-center gap-2"
@@ -150,72 +148,103 @@ export default function FoxBirdLanding() {
             </a>
           </div>
 
-          {/* Hero Visual Dashboard Preview */}
-          <div className="mt-20 relative mx-auto max-w-5xl">
-            <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-transparent to-transparent z-10" />
-            <div className="rounded-xl border border-white/10 bg-[#111] p-2 shadow-2xl">
-              <div className="rounded-lg overflow-hidden bg-[#0A0A0A]">
-                 {/* Replace with a screenshot of your actual Internship Workspace */}
-                 <div className="aspect-video bg-gray-900 flex items-center justify-center relative group">
-                    <div className="absolute inset-0 bg-[url('https://cdn.dribbble.com/users/1615584/screenshots/15967008/media/e2ba2960683a483a934db3b2074f762f.jpg?compress=1&resize=1600x1200')] bg-cover bg-center opacity-50 grayscale group-hover:grayscale-0 transition-all duration-700"></div>
-                    <div className="z-10 text-center">
-                        <div className="w-16 h-16 bg-[#FF4A1F] rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-orange-500/40">
-                            <Briefcase className="text-black" size={32} />
-                        </div>
-                        <h3 className="text-2xl font-bold text-white">Internship Workspace</h3>
-                        <p className="text-gray-400">Kanban Board • Code Review • Repo Sync</p>
-                    </div>
-                 </div>
-              </div>
+          {/* Hero Visual Dashboard Preview (FIXED IMAGE SCALING) */}
+          <div className="relative mx-auto max-w-6xl">
+  {/* top fade */}
+  <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-transparent to-transparent z-10 pointer-events-none" />
+
+  <div className="rounded-xl border border-white/10 bg-[#111] p-2 shadow-2xl">
+    <div className="rounded-lg overflow-hidden bg-[#0A0A0A]">
+      
+      <div className="relative w-full h-auto group">
+        {/* Screenshot */}
+        <img
+          src={dashboardShot}
+          alt="Internship Workspace Screenshot"
+          className="
+            w-full h-auto object-contain
+            transition-all duration-700 ease-out
+            group-hover:scale-[1.01]
+          "
+        />
+
+        {/* 🔥 Overlay Content */}
+        <div className="absolute inset-0 flex items-end justify-center z-20 pointer-events-none">
+          <div
+            className="
+              mb-6
+              backdrop-blur-md bg-black/50
+              px-8 py-5
+              rounded-2xl
+              border border-white/10
+              text-center
+              shadow-xl
+              transition-all duration-700
+              group-hover:translate-y-[-6px]
+              group-hover:bg-black/60
+            "
+          >
+            <div className="w-14 h-14 bg-[#FF4A1F] rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg shadow-orange-500/40">
+              <Briefcase className="text-black" size={28} />
             </div>
+
+            <h3 className="text-xl md:text-2xl font-bold text-white">
+              Internship Workspace
+            </h3>
+
+            <p className="text-gray-300 text-sm md:text-base mt-1">
+              Kanban Board • Code Review • Repo Sync
+            </p>
           </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
         </div>
       </section>
 
-      {/* --- TRUSTED BY --- */}
-      {/* <div className="border-y border-white/5 bg-black/40 py-10">
-        <div className="max-w-7xl mx-auto px-6 text-center">
-          <p className="text-sm font-semibold text-gray-500 uppercase tracking-widest mb-6">Trusted by students from</p>
-          <TrustedBy /> 
-        </div>
-      </div> */}
+     
+     
 
       {/* --- FEATURES GRID --- */}
-      <section id="features" className="py-24 bg-[#0A0A0A]">
-        <div className="max-w-7xl mx-auto px-6">
+      <section id="features" className="py-20 bg-[#0A0A0A]">
+        <div className="max-w-[1400px] mx-auto px-6">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-5xl font-bold mb-4">Complete Career Ecosystem</h2>
             <p className="text-gray-400 max-w-2xl mx-auto">We don't just teach syntax. We simulate the entire job experience so you are ready for Day 1.</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <FeatureCard 
-              icon={<Briefcase className="text-[#FF4A1F]" size={32} />}
+              icon={<Briefcase className="text-[#FF4A1F]" size={28} />}
               title="Virtual Internships"
               desc="Work on real-world tasks (e.g. 'Fix Auth Bug'). Use a Kanban board, submit PRs, and get promoted from Intern to Architect."
             />
             <FeatureCard 
-              icon={<Mic className="text-purple-500" size={32} />}
+              icon={<Mic className="text-purple-500" size={28} />}
               title="AI Mock Interviews"
               desc="Speak your answers. Our AI analyzes your voice, confidence, and technical accuracy to give you a hiring score instantly."
             />
             <FeatureCard 
-              icon={<Code className="text-green-500" size={32} />}
+              icon={<Code className="text-green-500" size={28} />}
               title="Coding Arena"
               desc="Solve DSA problems and build mini-projects in our browser-based IDE. Earn coins and badges for every passing test case."
             />
             <FeatureCard 
-              icon={<Zap className="text-yellow-500" size={32} />}
+              icon={<Zap className="text-yellow-500" size={28} />}
               title="Instant Feedback"
               desc="No waiting for mentors. Our AI Senior Architect reviews your code line-by-line and rejects lazy submissions immediately."
             />
             <FeatureCard 
-              icon={<Globe className="text-blue-500" size={32} />}
+              icon={<Globe className="text-blue-500" size={28} />}
               title="Global Leaderboard"
               desc="Compete with thousands of students. Climb the ranks based on XP earned from internships and challenges."
             />
             <FeatureCard 
-              icon={<Shield className="text-red-500" size={32} />}
+              icon={<Shield className="text-red-500" size={28} />}
               title="Verified Certificates"
               desc="Earn credentials that actually matter. Download PDF certificates with unique IDs upon project completion."
             />
@@ -224,18 +253,18 @@ export default function FoxBirdLanding() {
       </section>
 
       {/* --- INTERNSHIP PREVIEW SECTION --- */}
-      <section id="internships" className="py-24 bg-[#0F0F10] relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+      <section id="internships" className="py-20 bg-[#0F0F10] relative overflow-hidden">
+        <div className="max-w-[1400px] mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div>
-            <div className="inline-block px-3 py-1 bg-orange-500/10 text-[#FF4A1F] rounded-full text-sm font-bold mb-6 border border-orange-500/20">
+            <div className="inline-block px-3 py-1 bg-orange-500/10 text-[#FF4A1F] rounded-full text-sm font-bold mb-4 border border-orange-500/20">
               Simulation Engine
             </div>
-            <h2 className="text-4xl font-bold mb-6">Experience the Job <br/> Before You Get the Job.</h2>
-            <p className="text-gray-400 text-lg mb-8">
+            <h2 className="text-4xl font-bold mb-4">Experience the Job <br/> Before You Get the Job.</h2>
+            <p className="text-gray-400 text-lg mb-6">
               Fox Bird gives you a workspace that mimics top tech companies. You don't just watch videos; you move tickets, write code, and push to production.
             </p>
             
-            <ul className="space-y-4 mb-10">
+            <ul className="space-y-3 mb-8">
               {[
                 "Kanban Board Task Management",
                 "Strict 'Senior Dev' AI Code Review",
@@ -258,7 +287,7 @@ export default function FoxBirdLanding() {
 
           <div className="relative">
             {/* Visual Representation of Kanban/IDE */}
-            <div className="bg-[#1a1a1a] rounded-2xl p-6 border border-white/5 shadow-2xl relative z-10 rotate-2 hover:rotate-0 transition-transform duration-500">
+            <div className="bg-[#1a1a1a] rounded-2xl p-6 border border-white/5 shadow-2xl relative z-10 rotate-1 hover:rotate-0 transition-transform duration-500">
                <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
                   <div className="flex gap-2">
                      <div className="w-3 h-3 rounded-full bg-red-500"/>
@@ -301,11 +330,11 @@ export default function FoxBirdLanding() {
       </section>
 
       {/* --- PRICING SECTION --- */}
-      <section id="pricing" className="py-24 bg-[#0A0A0A]">
-        <div className="max-w-7xl mx-auto px-6 text-center">
-          <h2 className="text-3xl font-bold mb-12">Invest in Your Career</h2>
-          <div className="flex flex-wrap gap-8 justify-center">
-            {/* Reuse your existing pricing component logic or inline simplified versions */}
+      <section id="pricing" className="py-20 bg-[#0A0A0A]">
+        <div className="max-w-[1400px] mx-auto px-6 text-center">
+          <h2 className="text-3xl font-bold mb-10">Invest in Your Career</h2>
+          <div className="flex flex-wrap gap-6 justify-center">
+            {/* Simplified Pricing Cards for Layout */}
             <PricingCard 
                tier="Free Tier" 
                price="0" 
@@ -327,9 +356,9 @@ export default function FoxBirdLanding() {
       </section>
 
       {/* --- CTA FOOTER --- */}
-      <section className="py-20 border-t border-white/10 bg-[#050505]">
+      <section className="py-16 border-t border-white/10 bg-[#050505]">
         <div className="max-w-4xl mx-auto px-6 text-center">
-          <h2 className="text-4xl font-bold mb-6">Ready to become a Senior Dev?</h2>
+          <h2 className="text-3xl md:text-4xl font-bold mb-6">Ready to become a Senior Dev?</h2>
           <p className="text-gray-400 mb-8 text-lg">
             Join the community of developers who are learning by doing. No more passive watching.
           </p>
@@ -340,7 +369,7 @@ export default function FoxBirdLanding() {
       </section>
 
       {/* --- FOOTER --- */}
-      <footer className="bg-black py-10 border-t border-white/5 text-center text-gray-600 text-sm">
+      <footer className="bg-black py-8 border-t border-white/5 text-center text-gray-600 text-sm">
         <p>&copy; 2025 Fox Bird (Motia). All rights reserved.</p>
       </footer>
 

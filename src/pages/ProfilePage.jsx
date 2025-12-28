@@ -18,7 +18,7 @@ import {
   BarChart2, Users, DollarSign, CheckCircle,
   Clock, Home, Menu, X, ClipboardList, Mic, Layers, 
   Code, TrendingUp, FileText, Briefcase,
-  Zap, Shield
+  Zap, Shield, PlusCircle, Activity
 } from "lucide-react";
 
 export default function ProfilePage({ defaultTab = "overview" }) {
@@ -64,28 +64,31 @@ export default function ProfilePage({ defaultTab = "overview" }) {
         setRole(profile.role || "student");
       }
 
-      const { data: internStats } = await supabase
-        .from('user_internship_stats')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
+      // Fetch stats only if student to avoid errors for teachers who might not have this table
+      if (profile?.role === 'student' || !profile?.role) {
+          const { data: internStats } = await supabase
+            .from('user_internship_stats')
+            .select('*')
+            .eq('user_id', user.id)
+            .single();
 
-      const { data: certs } = await supabase
-        .from('certificates')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('issued_at', { ascending: false });
-      
-      setCertificates(certs || []);
+          const { data: certs } = await supabase
+            .from('certificates')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('issued_at', { ascending: false });
+          
+          setCertificates(certs || []);
 
-      const practiceCoins = profile?.total_coins || 0; 
-      const internshipCoins = internStats?.coins || 0;
-      
-      setUnifiedStats({
-          xp: internStats?.total_xp || 0,
-          coins: practiceCoins + internshipCoins,
-          rank: internStats?.career_role || "Intern"
-      });
+          const practiceCoins = profile?.total_coins || 0; 
+          const internshipCoins = internStats?.coins || 0;
+          
+          setUnifiedStats({
+              xp: internStats?.total_xp || 0,
+              coins: practiceCoins + internshipCoins,
+              rank: internStats?.career_role || "Intern"
+          });
+      }
 
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -145,7 +148,7 @@ export default function ProfilePage({ defaultTab = "overview" }) {
             <div className="overflow-hidden">
               <h3 className="font-semibold truncate w-32">{displayUserName}</h3>
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-800 text-gray-400 border border-gray-700 uppercase tracking-wider">
-                {unifiedStats.rank}
+                {role === 'student' ? unifiedStats.rank : role}
               </span>
             </div>
           </div>
@@ -409,14 +412,168 @@ function StudentView({ activeTab, user, stats, certificates, onViewCert }) {
 
 // --- CREATOR VIEW ---
 function CreatorView({ activeTab }) {
-  if (activeTab === "overview") return <div className="text-gray-500">Teacher Dashboard</div>;
+  // Enhanced Teacher Overview
+  if (activeTab === "overview") {
+    return (
+      <div className="space-y-8">
+        {/* Quick Stats Row */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <StatCard 
+            icon={Users} 
+            title="Total Students" 
+            value="1,240" 
+            trend="+12%" 
+            color="orange"
+          />
+          <StatCard 
+            icon={BookOpen} 
+            title="Active Courses" 
+            value="8" 
+            trend="Active" 
+            color="blue"
+          />
+          <StatCard 
+            icon={DollarSign} 
+            title="Total Revenue" 
+            value="$12,450" 
+            trend="+8.5%" 
+            color="green"
+          />
+          <StatCard 
+            icon={Activity} 
+            title="Course Completion" 
+            value="85%" 
+            trend="+2.4%" 
+            color="purple"
+          />
+        </div>
+
+        {/* Main Content Area: Charts & Quick Actions */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          
+          {/* Quick Actions Panel */}
+          <div className="lg:col-span-1 bg-[#111] border border-gray-800 rounded-2xl p-6 h-full">
+            <h3 className="text-lg font-bold text-white mb-6">Quick Actions</h3>
+            <div className="space-y-4">
+              <button className="w-full flex items-center justify-between p-4 rounded-xl bg-[#1A1A1A] hover:bg-[#222] border border-gray-700 transition-colors group">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-500/10 rounded-lg text-blue-500">
+                    <PlusCircle size={20} />
+                  </div>
+                  <span className="font-medium text-gray-200">Create New Course</span>
+                </div>
+                <ArrowRight size={16} className="text-gray-500 group-hover:translate-x-1 transition-transform" />
+              </button>
+
+              <button className="w-full flex items-center justify-between p-4 rounded-xl bg-[#1A1A1A] hover:bg-[#222] border border-gray-700 transition-colors group">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-purple-500/10 rounded-lg text-purple-500">
+                    <FileText size={20} />
+                  </div>
+                  <span className="font-medium text-gray-200">Post Assignment</span>
+                </div>
+                <ArrowRight size={16} className="text-gray-500 group-hover:translate-x-1 transition-transform" />
+              </button>
+
+              <button className="w-full flex items-center justify-between p-4 rounded-xl bg-[#1A1A1A] hover:bg-[#222] border border-gray-700 transition-colors group">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-orange-500/10 rounded-lg text-orange-500">
+                    <Briefcase size={20} />
+                  </div>
+                  <span className="font-medium text-gray-200">Manage Internships</span>
+                </div>
+                <ArrowRight size={16} className="text-gray-500 group-hover:translate-x-1 transition-transform" />
+              </button>
+            </div>
+          </div>
+
+          {/* Recent Enrollments / Activity */}
+          <div className="lg:col-span-2 bg-[#111] border border-gray-800 rounded-2xl overflow-hidden">
+            <div className="p-6 border-b border-gray-800 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-white">Recent Student Activity</h3>
+              <button className="text-sm text-gray-500 hover:text-white">View All</button>
+            </div>
+            <div className="p-0">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="bg-black/50 text-gray-500 uppercase text-xs">
+                    <th className="px-6 py-3 font-medium">Student</th>
+                    <th className="px-6 py-3 font-medium">Action</th>
+                    <th className="px-6 py-3 font-medium">Course/Task</th>
+                    <th className="px-6 py-3 font-medium text-right">Time</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-800">
+                  {/* Mock Data for Overview */}
+                  {[
+                    { student: "Alex Doe", action: "Submitted", target: "React Basics Assignment", time: "2 mins ago" },
+                    { student: "Sarah Smith", action: "Enrolled", target: "Advanced Node.js", time: "1 hour ago" },
+                    { student: "John Brown", action: "Completed", target: "Python Internship Task 1", time: "3 hours ago" },
+                    { student: "Emily White", action: "Posted", target: "Community Forum", time: "5 hours ago" },
+                  ].map((activity, idx) => (
+                    <tr key={idx} className="hover:bg-white/5 transition-colors">
+                      <td className="px-6 py-4 font-medium text-white">{activity.student}</td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2 py-1 rounded text-xs font-bold 
+                          ${activity.action === 'Submitted' ? 'bg-blue-500/10 text-blue-500' : 
+                            activity.action === 'Enrolled' ? 'bg-green-500/10 text-green-500' : 
+                            'bg-gray-800 text-gray-400'}`}>
+                          {activity.action}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-gray-300">{activity.target}</td>
+                      <td className="px-6 py-4 text-right text-gray-500">{activity.time}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
   if (activeTab === "manage-content") return <ManageCourses />;
   if (activeTab === "assignments") return <AssignmentManager />;
   if (activeTab === "practice-sets") return <PracticeSetBuilder />;
   return <PlaceholderSection title={activeTab} icon={BookOpen} />;
 }
 
-function StatCard({ icon: Icon, title, value, trend, color="orange" }) { /* ... same as before ... */ return null; }
+// --- HELPER COMPONENTS (Restored Functionality) ---
+
+// 1. Functional StatCard for Teacher Dashboard
+function StatCard({ icon: Icon, title, value, trend, color="orange" }) {
+  // Map string colors to Tailwind classes
+  const colorStyles = {
+    orange: { text: "text-[#FF4A1F]", bg: "bg-[#FF4A1F]/10", border: "border-[#FF4A1F]/20" },
+    green: { text: "text-emerald-500", bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
+    blue: { text: "text-blue-500", bg: "bg-blue-500/10", border: "border-blue-500/20" },
+    purple: { text: "text-purple-500", bg: "bg-purple-500/10", border: "border-purple-500/20" },
+  };
+
+  const style = colorStyles[color] || colorStyles.orange;
+
+  return (
+    <div className={`bg-[#111] p-6 rounded-2xl border border-gray-800 hover:border-gray-700 transition-all`}>
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-gray-400 text-sm font-medium">{title}</p>
+          <h4 className="text-3xl font-bold mt-2 text-white">{value}</h4>
+          <span className={`text-xs mt-2 inline-block font-medium ${
+            trend.includes('+') ? 'text-green-500' : 'text-gray-500'
+          }`}>
+            {trend} {trend.includes('+') ? 'vs last month' : ''}
+          </span>
+        </div>
+        <div className={`p-3 rounded-xl ${style.bg} ${style.text}`}>
+          <Icon size={24} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AchievementCard({ title, icon, unlocked }) {
   return (
     <div className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-2 ${unlocked ? "bg-[#111] border-gray-800" : "bg-[#0A0A0A] border-gray-900 opacity-50 grayscale"}`}>
@@ -426,11 +583,35 @@ function AchievementCard({ title, icon, unlocked }) {
     </div>
   );
 }
+
 function PlaceholderSection({ title, icon: Icon }) {
+  // Lucide icons like ArrowRight might not be defined if not imported, 
+  // but PlaceholderSection uses generic Icon passed to it.
   return (
     <div className="flex flex-col items-center justify-center h-96 text-gray-500 border border-dashed border-gray-800 rounded-2xl bg-[#111]/50">
       <Icon size={48} className="mb-4 opacity-50" />
       <h3 className="text-lg font-semibold capitalize">{title} Content Coming Soon</h3>
     </div>
   );
+}
+
+// Helper ArrowRight for quick actions since it wasn't explicitly imported in the sub-component scope in previous snippet
+function ArrowRight({ size, className }) {
+    return (
+        <svg 
+            xmlns="http://www.w3.org/2000/svg" 
+            width={size} 
+            height={size} 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="2" 
+            strokeLinecap="round" 
+            strokeLinejoin="round" 
+            className={className}
+        >
+            <path d="M5 12h14" />
+            <path d="m12 5 7 7-7 7" />
+        </svg>
+    );
 }

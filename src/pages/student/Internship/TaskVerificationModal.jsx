@@ -13,13 +13,12 @@ export default function TaskVerificationModal({ task, onClose, onSuccess }) {
     setResult(null);
 
     try {
-      const backendurl = import.meta.env.VITE_MOTIA_URL || 'http://localhost:5000';
+      const backendurl = import.meta.env.VITE_MOTIA_URL;
       const response = await fetch(`${backendurl}/api/verify-task`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           taskTitle: task.title,
-          // PASS STRICT REQUIREMENTS HERE
           taskDescription: task.requirements || "Implement functionality correctly.", 
           studentCode: code
         })

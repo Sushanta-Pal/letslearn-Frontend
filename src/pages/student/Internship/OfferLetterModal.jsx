@@ -1,16 +1,82 @@
-import React, { useState } from 'react';
-import { CheckCircle, ShieldCheck, X, Loader2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { CheckCircle, ShieldCheck, X, Loader2, Crown } from 'lucide-react';
+import { supabase } from '../../../supabaseClient'; // Ensure path is correct
+// import { handlePayment } from '../../../utils/paymentGateway'; // Uncomment if using real Razorpay
 
 export default function OfferLetterModal({ project, user, onAccept, onClose }) {
   const [processing, setProcessing] = useState(false);
+  const [isProMember, setIsProMember] = useState(false);
+  const [checkingStatus, setCheckingStatus] = useState(true);
 
-  const handlePayment = async () => {
+  // 1. CHECK IF USER IS PRO (Has valid transaction)
+  useEffect(() => {
+    const checkProStatus = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('transactions')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('status', 'success')
+          // You can check for specific plan names here if needed:
+          // .eq('plan_name', 'Pro Plan') 
+          .limit(1);
+
+        if (data && data.length > 0) {
+          setIsProMember(true);
+        }
+      } catch (err) {
+        console.error("Error checking pro status:", err);
+      } finally {
+        setCheckingStatus(false);
+      }
+    };
+
+    checkProStatus();
+  }, [user.id]);
+
+  // 2. HANDLE ACCEPTANCE
+  const handleAcceptOffer = async () => {
     setProcessing(true);
-    // Simulate Payment Gateway delay
-    setTimeout(() => {
+
+    if (isProMember) {
+      // --- SCENARIO A: PRO USER (SKIP PAYMENT) ---
+      // Simulate brief loading for UX
+      setTimeout(() => {
+        setProcessing(false);
+        onAccept(); // Directly accept
+      }, 1000);
+
+    } else {
+      // --- SCENARIO B: NORMAL USER (PAYMENT REQUIRED) ---
+      
+      // NOTE: In production, uncomment the real Razorpay call below
+      /*
+      await handlePayment({
+          amount: project.price || 149,
+          name: "Internship Fee",
+          description: project.title,
+          userEmail: user.email,
+          onSuccess: async (response) => {
+             // Save transaction first, then accept
+             await supabase.from('transactions').insert({
+                 user_id: user.id,
+                 payment_id: response.razorpay_payment_id,
+                 amount: project.price || 149,
+                 status: 'success',
+                 plan_name: 'Internship Fee'
+             });
+             onAccept();
+          }
+      });
       setProcessing(false);
-      onAccept(); 
-    }, 2000);
+      */
+
+      // For now (Simulation as per your request):
+      setTimeout(() => {
+        setProcessing(false);
+        onAccept(); 
+      }, 2000);
+    }
   };
 
   return (
@@ -34,6 +100,11 @@ export default function OfferLetterModal({ project, user, onAccept, onClose }) {
               <div className="flex items-center gap-3 text-sm text-gray-300">
                  <CheckCircle className="text-emerald-400" size={18}/> Certificate Included
               </div>
+              {isProMember && (
+                  <div className="flex items-center gap-3 text-sm text-yellow-400 font-bold bg-yellow-400/10 p-2 rounded-lg border border-yellow-400/20">
+                    <Crown size={18}/> Pro Member Benefit
+                  </div>
+              )}
            </div>
         </div>
 
@@ -60,21 +131,47 @@ export default function OfferLetterModal({ project, user, onAccept, onClose }) {
                  <div className="flex justify-between items-center border-t border-gray-200 pt-2 mt-2">
                     <span className="text-gray-500 text-xs uppercase">Fee</span>
                     <div className="text-right">
-                       <span className="text-gray-400 line-through text-xs mr-2">₹999</span>
-                       <span className="text-emerald-700 font-bold text-lg">₹{project.price || 149}</span>
+                       {isProMember ? (
+                           <>
+                             <span className="text-gray-400 line-through text-xs mr-2">₹{project.price || 149}</span>
+                             <span className="text-emerald-600 font-bold text-lg">FREE</span>
+                             <p className="text-[10px] text-emerald-600 font-medium">Included with Pro Plan</p>
+                           </>
+                       ) : (
+                           <>
+                             <span className="text-gray-400 line-through text-xs mr-2">₹999</span>
+                             <span className="text-emerald-700 font-bold text-lg">₹{project.price || 149}</span>
+                           </>
+                       )}
                     </div>
                  </div>
               </div>
            </div>
 
            <div className="mt-8">
-              <button 
-                onClick={handlePayment} 
-                disabled={processing}
-                className="w-full bg-black text-white hover:bg-gray-800 font-sans font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg hover:shadow-xl disabled:opacity-70 disabled:cursor-not-allowed"
-              >
-                {processing ? <Loader2 className="animate-spin" /> : `Accept Offer & Pay ₹${project.price || 149}`}
-              </button>
+              {checkingStatus ? (
+                 <button disabled className="w-full bg-gray-100 text-gray-400 font-bold py-4 rounded-xl flex items-center justify-center gap-2">
+                    <Loader2 className="animate-spin" size={20} /> Checking Eligibility...
+                 </button>
+              ) : (
+                <button 
+                    onClick={handleAcceptOffer} 
+                    disabled={processing}
+                    className={`w-full font-sans font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg hover:shadow-xl disabled:opacity-70 disabled:cursor-not-allowed ${
+                        isProMember 
+                        ? "bg-emerald-600 hover:bg-emerald-500 text-white" 
+                        : "bg-black text-white hover:bg-gray-800"
+                    }`}
+                >
+                    {processing ? (
+                        <Loader2 className="animate-spin" />
+                    ) : isProMember ? (
+                        <>Claim Offer (Free) <CheckCircle size={18}/></>
+                    ) : (
+                        `Accept Offer & Pay ₹${project.price || 149}`
+                    )}
+                </button>
+              )}
            </div>
         </div>
 

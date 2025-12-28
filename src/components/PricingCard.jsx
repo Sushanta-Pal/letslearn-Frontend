@@ -1,18 +1,78 @@
-import ComingSoon from "./screens/ComingSoon";
 import React from "react";
 import ReactDOM from "react-dom";
+import ComingSoon from "./screens/ComingSoon"; 
+import { handlePayment } from "../paymentGateway"; 
+import { supabase } from "../supabaseClient"; // Import Supabase
 
 export default function PricingCard({ tier, price, features, highlighted }) {
   const [showComingSoon, setShowComingSoon] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
+
+  const handleButtonClick = async () => {
+    // 1. Get Current User
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      alert("Please login to subscribe.");
+      return;
+    }
+
+    if (tier === "Lifetime" || tier === "Pro Intern") {
+      setShowComingSoon(true);
+      return;
+    }
+
+    // 2. Trigger Payment
+    handlePayment({
+      amount: price,
+      name: "Your App Name",
+      description: `${tier} Plan Subscription`,
+      userEmail: user.email,
+      
+      // 3. HANDLE SUCCESS (Save to Supabase)
+      onSuccess: async (response) => {
+        try {
+          setLoading(true);
+          
+          // A. Insert into Transactions Table
+          const { error } = await supabase.from('transactions').insert({
+            user_id: user.id,
+            payment_id: response.razorpay_payment_id,
+            amount: price,
+            plan_name: tier,
+            status: 'success'
+          });
+
+          if (error) throw error;
+
+          // B. (Optional) Update User Profile Role
+          // e.g., Make them a 'pro' user
+          /* await supabase.from('profiles')
+            .update({ role: 'pro_user' })
+            .eq('id', user.id); 
+          */
+
+          alert(`Payment Successful! Transaction saved. ID: ${response.razorpay_payment_id}`);
+        
+        } catch (err) {
+          console.error("Database Error:", err);
+          alert("Payment succeeded, but saving failed. Contact support.");
+        } finally {
+          setLoading(false);
+        }
+      }
+    });
+  };
+
   return (
     <div
       className={`relative w-80 p-8 rounded-2xl border transition-all duration-300 backdrop-blur-sm
-${
-  highlighted
-    ? "bg-[#FF4A1F] text-black border-[#FF6B3A] shadow-xl scale-[1.03]"
-    : "bg-[#0D0D0D] text-gray-300 border-gray-800 hover:border-gray-600"
-}
-`}
+      ${
+        highlighted
+          ? "bg-[#FF4A1F] text-black border-[#FF6B3A] shadow-xl scale-[1.03]"
+          : "bg-[#0D0D0D] text-gray-300 border-gray-800 hover:border-gray-600"
+      }
+      `}
     >
       {highlighted && (
         <span className="absolute -top-5 left-1/2 transform -translate-x-1/2 bg-white text-black px-3 py-1 text-xs font-semibold rounded-full shadow">
@@ -42,17 +102,20 @@ ${
 
       <button
         type="button"
-        onClick={() => setShowComingSoon(true)}
+        onClick={handleButtonClick}
+        disabled={loading}
         className={`w-full py-2 rounded-md font-semibold mt-8 transition-all
-${
-  highlighted
-    ? "bg-black text-[#FF4A1F] hover:bg-black/80"
-    : "bg-[#FF4A1F] text-black hover:bg-[#ff5c2d]"
-}
-`}
+        ${
+          highlighted
+            ? "bg-black text-[#FF4A1F] hover:bg-black/80"
+            : "bg-[#FF4A1F] text-black hover:bg-[#ff5c2d]"
+        }
+        ${loading ? "opacity-50 cursor-not-allowed" : ""}
+        `}
       >
-        Get Started
+        {loading ? "Processing..." : "Get Started"}
       </button>
+
       {showComingSoon &&
         ReactDOM.createPortal(
           <ComingSoon onClose={() => setShowComingSoon(false)} />,

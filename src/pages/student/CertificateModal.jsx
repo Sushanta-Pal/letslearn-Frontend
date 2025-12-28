@@ -1,30 +1,29 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { X, Download, Share2, Award, ExternalLink } from 'lucide-react';
+import { X, Download, Award, ExternalLink } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useReactToPrint } from 'react-to-print';
-import { supabase } from '../../supabaseClient'; // Ensure supabase import
-
-const logoUrl = "https://cdn-icons-png.flaticon.com/512/993/993891.png"; 
-const signatureUrl = "https://upload.wikimedia.org/wikipedia/commons/e/e4/John_Hancock_Signature.svg"; 
+import { supabase } from '../../supabaseClient';
+import signatureUrl from '../../assets/sushanta-sign.png'; // Ensure this path is correct
+import logoUrl from '../../assets/logourl.png'; // Ensure this path is correct
 
 const CertificateModal = ({ certificate, user, onClose }) => {
   const certificateRef = useRef(null);
   const [repoLink, setRepoLink] = useState(null);
 
-  // --- NEW: FETCH REPO LINK USING SUBMISSION ID ---
+  // --- FETCH REPO LINK ---
   useEffect(() => {
     const fetchSubmissionDetails = async () => {
-        if (!certificate?.submission_id) return;
-        
-        const { data, error } = await supabase
-            .from('internship_submissions')
-            .select('repo_link')
-            .eq('id', certificate.submission_id)
-            .single();
+      if (!certificate?.submission_id) return;
+      
+      const { data } = await supabase
+        .from('internship_submissions')
+        .select('repo_link')
+        .eq('id', certificate.submission_id)
+        .single();
 
-        if (data && data.repo_link) {
-            setRepoLink(data.repo_link);
-        }
+      if (data && data.repo_link) {
+        setRepoLink(data.repo_link);
+      }
     };
     fetchSubmissionDetails();
   }, [certificate]);
@@ -41,19 +40,37 @@ const CertificateModal = ({ certificate, user, onClose }) => {
     `,
   });
 
-  const handleLinkedInShare = () => {
-    const shareUrl = window.location.href; 
-    const title = certificate?.title || 'Internship Program';
-    const message = `I am proud to receive this Certificate of Completion for the ${title}! 🎓\n\nCheck it out here: ${shareUrl}`;
-    const linkedInUrl = `https://www.linkedin.com/feed/?shareActive=true&text=${encodeURIComponent(message)}`;
-    window.open(linkedInUrl, '_blank', 'width=600,height=600');
-  };
-
   if (!certificate) return null;
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/95 backdrop-blur-sm p-4">
-      
+      {/* Inject Fonts and Custom Styles */}
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Great+Vibes&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap');
+        
+        .font-cinzel { font-family: 'Cinzel', serif; }
+        .font-playfair { font-family: 'Playfair Display', serif; }
+        .font-vibes { font-family: 'Great Vibes', cursive; }
+        
+        .gold-gradient-text {
+          background: linear-gradient(to bottom, #ca8a04, #eab308, #a16207);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+        }
+        
+        .certificate-border {
+          background-image: 
+            linear-gradient(90deg, #1e3a8a 50%, transparent 50%),
+            linear-gradient(90deg, #1e3a8a 50%, transparent 50%),
+            linear-gradient(0deg, #1e3a8a 50%, transparent 50%),
+            linear-gradient(0deg, #1e3a8a 50%, transparent 50%);
+          background-repeat: repeat-x, repeat-x, repeat-y, repeat-y;
+          background-size: 15px 4px, 15px 4px, 4px 15px, 4px 15px;
+          background-position: 0px 0px, 200px 100%, 0px 100%, 100% 0px;
+          animation: border-dance 4s infinite linear;
+        }
+      `}</style>
+
       <motion.div 
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -72,74 +89,137 @@ const CertificateModal = ({ certificate, user, onClose }) => {
             </div>
           </div>
           <div className="flex gap-3">
-            <button onClick={() => handleDownload()} className="flex items-center gap-2 px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg shadow-lg text-sm"><Download size={16} /> Download PDF</button>
-            <button onClick={onClose} className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-gray-300 hover:text-white ml-2"><X size={20} /></button>
+            <button onClick={() => handleDownload()} className="flex items-center gap-2 px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg shadow-lg text-sm transition-all">
+              <Download size={16} /> Download PDF
+            </button>
+            <button onClick={onClose} className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-gray-300 hover:text-white ml-2 transition-all">
+              <X size={20} />
+            </button>
           </div>
         </div>
 
-        {/* Certificate Content */}
-        <div className="flex-1 overflow-auto bg-neutral-900 p-8 flex justify-center items-start">
-          <div ref={certificateRef} className="relative w-[1123px] h-[794px] bg-white text-black shrink-0 shadow-2xl mx-auto overflow-hidden">
+        {/* Certificate Content Area */}
+        <div className="flex-1 overflow-auto bg-neutral-900 p-8 flex justify-center items-center">
+          
+          {/* THE CERTIFICATE */}
+          <div ref={certificateRef} className="relative w-[1123px] h-[794px] bg-[#fffbf0] text-black shrink-0 shadow-2xl mx-auto overflow-hidden">
             
-            {/* Background Layers */}
-            <div className="absolute inset-0 opacity-40 mix-blend-multiply" style={{ backgroundImage: `url("https://www.transparenttextures.com/patterns/cream-paper.png")` }}></div>
-            <div className="absolute inset-0 opacity-[0.03]" style={{ background: `radial-gradient(circle at center, transparent 30%, #000 100%)`, backgroundSize: '8px 8px' }}></div>
-            <div className="absolute inset-6 border-[8px] border-double border-[#1e3a8a]"></div>
+            {/* 1. Background Texture */}
+            <div className="absolute inset-0 opacity-40 mix-blend-multiply pointer-events-none" style={{ backgroundImage: `url("https://www.transparenttextures.com/patterns/cream-paper.png")` }}></div>
             
-            {/* Certificate Body */}
-            <div className="relative h-full flex flex-col items-center justify-between py-12 px-20 z-10">
+            {/* 2. Ornamental Border Container */}
+            <div className="absolute inset-4 border-[3px] border-[#1e3a8a] pointer-events-none z-10">
+              <div className="absolute inset-1 border border-[#ca8a04]"></div>
+              {/* Corner Ornaments */}
+              <div className="absolute top-0 left-0 w-16 h-16 border-t-[8px] border-l-[8px] border-[#1e3a8a]"></div>
+              <div className="absolute top-0 right-0 w-16 h-16 border-t-[8px] border-r-[8px] border-[#1e3a8a]"></div>
+              <div className="absolute bottom-0 left-0 w-16 h-16 border-b-[8px] border-l-[8px] border-[#1e3a8a]"></div>
+              <div className="absolute bottom-0 right-0 w-16 h-16 border-b-[8px] border-r-[8px] border-[#1e3a8a]"></div>
+            </div>
+
+            {/* 3. Certificate Content */}
+            <div className="relative h-full flex flex-col items-center justify-between py-16 px-24 z-20">
               
-              {/* Top Header */}
-              <div className="w-full flex justify-between items-start mt-4">
-                 <img src={logoUrl} alt="Logo" className="h-20 w-auto object-contain mb-2" onError={(e) => e.target.style.display = 'none'} />
-                 <div className="text-right mt-2">
-                   <p className="text-[10px] text-gray-400 font-mono tracking-widest uppercase">Serial No.</p>
-                   <p className="text-xs font-bold text-[#1e3a8a] font-mono">{certificate.id ? certificate.id.slice(0, 12).toUpperCase() : "8F-1E9F66"}</p>
-                 </div>
-              </div>
-
-              {/* Title & Name */}
-              <div className="text-center -mt-8">
-                <h1 className="text-7xl font-serif font-black tracking-wide text-[#1e3a8a] mb-3">CERTIFICATE</h1>
-                <h2 className="text-2xl font-serif italic text-[#d97706] tracking-[0.2em] font-light">OF COMPLETION</h2>
-              </div>
-
-              <div className="text-center w-full mb-4">
-                <p className="text-gray-500 font-serif text-xl italic mb-6">This honor is proudly presented to</p>
-                <h3 className="text-6xl font-[cursive] text-gray-900 py-2 px-8 capitalize leading-tight" style={{ fontFamily: "'Great Vibes', cursive" }}>{user?.user_metadata?.full_name || 'Student Name'}</h3>
-                <div className="w-64 mx-auto h-[1px] bg-gray-300 mt-2"></div>
-              </div>
-
-              {/* Work Proof Link (NEW) */}
-              {repoLink && (
-                  <div className="text-center mt-2 mb-2 print-hidden">
-                      <a href={repoLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 justify-center text-xs text-blue-600 font-bold hover:underline">
-                          <ExternalLink size={10} /> Verified Project Work
-                      </a>
+              {/* Top Section */}
+              <div className="w-full flex justify-between items-start">
+                  <img src={logoUrl} alt="Logo" className="h-20 w-auto object-contain opacity-90" onError={(e) => e.target.style.display = 'none'} />
+                  <div className="text-right">
+                    <p className="text-[10px] text-gray-500 font-cinzel tracking-[0.2em] uppercase">Certificate ID</p>
+                    <p className="text-sm font-bold text-[#1e3a8a] font-mono">{certificate.id ? certificate.id.slice(0, 12).toUpperCase() : "8F-1E9F66"}</p>
                   </div>
-              )}
-
-              <div className="text-center max-w-4xl mx-auto space-y-3">
-                <p className="text-gray-600 text-lg font-serif">For successfully completing the professional internship requirements in</p>
-                <h4 className="text-3xl font-bold text-[#1e3a8a] font-serif py-1">{certificate.title || 'Software Engineering Program'}</h4>
               </div>
 
-              {/* Footer */}
-              <div className="w-full flex justify-between items-end px-12 mb-4">
-                <div className="text-center w-64 pb-2">
-                   <p className="font-serif text-xl text-gray-800 border-b-2 border-gray-300 pb-2 mb-2">{new Date(certificate.issued_at).toLocaleDateString()}</p>
-                   <p className="text-xs text-[#d97706] font-bold uppercase tracking-wider">Date of Issue</p>
+              {/* Title Section */}
+              <div className="text-center -mt-6">
+                <h1 className="text-6xl font-cinzel font-black tracking-wider text-[#1e3a8a] mb-2 uppercase drop-shadow-sm">
+                  Certificate
+                </h1>
+                <div className="flex items-center justify-center gap-4">
+                  <div className="h-[2px] w-12 bg-[#ca8a04]"></div>
+                  <h2 className="text-2xl font-cinzel text-[#ca8a04] tracking-[0.3em] font-bold uppercase">Of Completion</h2>
+                  <div className="h-[2px] w-12 bg-[#ca8a04]"></div>
                 </div>
-                <div className="relative translate-y-4 z-20">
-                   <div className="w-40 h-40 rounded-full bg-gradient-to-b from-[#fbbf24] to-[#b45309] shadow-2xl flex items-center justify-center">
-                      <Award size={56} className="text-white" />
+              </div>
+
+              {/* Recipient Section */}
+              <div className="text-center w-full">
+                <p className="text-gray-600 font-playfair text-xl italic mb-4">This is to certify that</p>
+                
+                {/* Name */}
+                <div className="relative inline-block px-12 pb-4">
+                  <h3 className="text-7xl font-vibes text-gray-900 py-2 capitalize z-10 relative drop-shadow-md">
+                    {user?.user_metadata?.full_name || 'Obito Uchiha'}
+                  </h3>
+                  {/* Decorative underline for name */}
+                  <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#1e3a8a] to-transparent opacity-50"></div>
+                </div>
+              </div>
+
+              {/* Course Info */}
+              <div className="text-center max-w-4xl mx-auto space-y-4">
+                <p className="text-gray-600 text-lg font-playfair italic">
+                  Has successfully completed all the requirements for the
+                </p>
+                <h4 className="text-4xl font-bold font-playfair text-[#1e3a8a] py-2 gold-gradient-text">
+                  {certificate.title || 'Frontend Developer Internship'}
+                </h4>
+                
+                {/* Proof Link */}
+                {repoLink && (
+                  <div className="text-center mt-2 print-hidden">
+                    <a href={repoLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-blue-50 text-blue-800 text-xs font-bold hover:bg-blue-100 transition-colors border border-blue-200">
+                       <ExternalLink size={10} /> Verified Project Work
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer Section (Date & Signature) */}
+              <div className="w-full flex justify-between items-end mt-8 relative">
+                
+                {/* Date */}
+                <div className="text-center w-64">
+                   <p className="font-playfair text-xl text-gray-800 mb-2">
+                     {new Date(certificate.issued_at).toLocaleDateString()}
+                   </p>
+                   <div className="h-[2px] bg-gray-300 w-full mb-2"></div>
+                   <p className="text-xs text-[#ca8a04] font-cinzel font-bold uppercase tracking-widest">Date of Issue</p>
+                </div>
+
+                {/* Central Gold Seal Badge */}
+                <div className="absolute left-1/2 transform -translate-x-1/2 bottom-0 translate-y-4">
+                   <div className="relative">
+                      {/* Ribbons */}
+                      <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-16 h-20 bg-[#1e3a8a] -z-10 transform -rotate-12 origin-top"></div>
+                      <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-16 h-20 bg-[#1e3a8a] -z-10 transform rotate-12 origin-top"></div>
+                      
+                      {/* Seal Body */}
+                      <div className="w-36 h-36 rounded-full bg-gradient-to-br from-[#fcd34d] via-[#b45309] to-[#78350f] shadow-xl flex items-center justify-center p-1">
+                        <div className="w-full h-full rounded-full border-[2px] border-[#fff] border-dashed flex items-center justify-center bg-[#ca8a04]">
+                           <Award size={48} className="text-white drop-shadow-md" />
+                        </div>
+                      </div>
                    </div>
                 </div>
-                <div className="text-center w-64 pb-2">
-                   <div className="h-16 flex items-end justify-center mb-2"><img src={signatureUrl} className="h-full w-auto object-contain filter contrast-125"/></div>
-                   <div className="border-b-2 border-gray-300 pb-2 w-full"></div>
-                   <p className="text-xs text-[#d97706] font-bold uppercase tracking-wider mt-2">Program Director</p>
+
+                {/* Signature - PLACEMENT FIXED */}
+                <div className="text-center w-64 flex flex-col items-center justify-end">
+                   {/* Signature Image: Negative margin pulls it down onto the line */}
+                   <div className="h-20 w-full flex items-end justify-center overflow-visible mb-[-10px] z-10">
+                      <img 
+                        src={signatureUrl} 
+                        alt="Signature"
+                        className="h-full w-auto object-contain mix-blend-multiply filter contrast-125 pointer-events-none" 
+                      />
+                   </div>
+                   
+                   {/* The Line */}
+                   <div className="h-[2px] bg-gray-300 w-full mb-2 relative z-0"></div>
+                   
+                   {/* Title */}
+                   <p className="text-xs text-[#ca8a04] font-cinzel font-bold uppercase tracking-widest">Program Director</p>
                 </div>
+
               </div>
 
             </div>
