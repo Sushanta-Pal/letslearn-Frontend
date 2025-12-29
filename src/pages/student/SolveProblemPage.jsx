@@ -11,13 +11,13 @@ export default function SolveProblemPage() {
   const [problem, setProblem] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // --- RESTORED FETCH LOGIC ---
+  // --- FETCH PROBLEM ---
   useEffect(() => {
     const fetchProblem = async () => {
       try {
         setLoading(true);
         const { data, error } = await supabase
-          .from('coding_questions') // Ensure this matches your table name
+          .from('coding_questions')
           .select('*')
           .eq('id', questionId)
           .single();
@@ -26,33 +26,41 @@ export default function SolveProblemPage() {
         setProblem(data);
       } catch (err) {
         console.error("Error loading problem:", err);
-        alert("Problem not found or deleted.");
-        navigate('/student/questions'); // Go back if error
+        alert("Problem not found.");
+        navigate('/student/questions');
       } finally {
         setLoading(false);
       }
     };
 
-    if (questionId) {
-      fetchProblem();
-    }
+    if (questionId) fetchProblem();
   }, [questionId, navigate]);
 
+  // --- SUBMISSION HANDLER ---
   const handleComplete = async (score, submittedCode, language) => { 
     if(score === 100) {
       confetti();
       const { data: { user } } = await supabase.auth.getUser();
-      
       const reward = problem.coin_reward || 10;
 
-      // 1. Record Solution WITH CODE and LANGUAGE
+      // 1. CHECK: Has user already solved this?
+      const { data: existingSolution } = await supabase
+        .from('student_solutions')
+        .select('status')
+        .eq('user_id', user.id)
+        .eq('question_id', questionId)
+        .maybeSingle();
+
+      const isAlreadySolved = existingSolution?.status === 'Solved';
+
+      // 2. SAVE: Always save the latest code (Upsert)
       const { error: saveError } = await supabase.from('student_solutions').upsert({
         user_id: user.id,
         question_id: questionId,
         status: 'Solved',
-        earned_coins: reward,
-        code_submitted: submittedCode, // Saves the actual code
-        language: language             // Saves the language (e.g., 'java')
+        earned_coins: isAlreadySolved ? 0 : reward, // Record 0 coins if re-solving
+        code_submitted: submittedCode,
+        language: language            
       }, { onConflict: 'user_id, question_id' });
 
       if (saveError) {
@@ -60,14 +68,18 @@ export default function SolveProblemPage() {
         return; 
       }
 
-      // 2. Add Coins (RPC call)
-      const { error: rpcError } = await supabase.rpc('increment_profile_coins', { 
-        p_amount: reward 
-      });
+      // 3. REWARD: Only add coins if it's the first time
+      if (!isAlreadySolved) {
+        const { error: rpcError } = await supabase.rpc('increment_profile_coins', { 
+          p_amount: reward 
+        });
 
-      if (rpcError) console.error("Wallet error:", rpcError);
+        if (rpcError) console.error("Wallet error:", rpcError);
+        alert(`Problem Solved! +${reward} Coins Added.`);
+      } else {
+        alert("Problem Solved! (You have already earned coins for this problem)");
+      }
 
-      alert(`Problem Solved! +${reward} Coins Added.`);
       navigate('/student/questions');
     } else {
         alert("Keep trying! You need to pass all test cases.");
@@ -95,7 +107,6 @@ export default function SolveProblemPage() {
       </div>
       
       <div className="flex-1 p-4">
-        {/* Pass the problem as an array since CodingModule expects a list */}
         <CodingModule 
           problems={[problem]} 
           onComplete={handleComplete} 
