@@ -1,87 +1,146 @@
 import React, { useState } from 'react';
-import { Loader2, Code, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { supabase } from '../../../supabaseClient';
+import { Loader2, GitCommit, X } from 'lucide-react';
+import CodingModule from '../CodingModule'; // Ensure this path is correct!
 
-export default function TaskVerificationModal({ task, onClose, onSuccess }) {
-  const [code, setCode] = useState('');
-  const [analyzing, setAnalyzing] = useState(false);
-  const [result, setResult] = useState(null); 
-  const [feedback, setFeedback] = useState('');
+export default function TaskVerificationModal({ task, projectTitle, onClose, onSuccess }) {
+  const [isCommitting, setIsCommitting] = useState(false);
+  const [commitStatus, setCommitStatus] = useState(null); // 'success' | 'error'
 
-  const handleVerify = async () => {
-    if (!code.trim()) return alert("Please paste your code.");
-    setAnalyzing(true);
-    setResult(null);
+  // --- SAFETY CHECK ---
+  // If task data is missing for any reason, don't crash, just return null or a loader
+  if (!task) return null;
 
-    try {
-      const backendurl = import.meta.env.VITE_MOTIA_URL;
-      const response = await fetch(`${backendurl}/api/verify-task`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          taskTitle: task.title,
-          taskDescription: task.requirements || "Implement functionality correctly.", 
-          studentCode: code
-        })
-      });
-
-      const data = await response.json();
-      setAnalyzing(false);
-      setFeedback(data.feedback);
-      
-      if (data.success) {
-        setResult('success');
-        setTimeout(() => onSuccess(data.xp || 50), 2000);
-      } else {
-        setResult('fail');
-      }
-    } catch (err) {
-      setAnalyzing(false);
-      alert("Verification Server Error");
+  // --- 1. DATA ADAPTER ---
+  // Convert Internship Task -> CodingModule "Problem" Format
+  const problemData = {
+    id: task.id || 'unknown-task',
+    title: task.title || 'Untitled Task',
+    description: task.requirements || 'No requirements provided.', 
+    difficulty: "Medium", 
+    test_cases: task.test_cases || [], 
+    starter_code: {
+      // Map the specific language or default to javascript
+      [task.language || 'javascript']: task.starter_code || '// Write your solution here'
     }
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-[#111] border border-gray-800 rounded-2xl w-full max-w-lg shadow-2xl">
-        <div className="p-6 border-b border-gray-800">
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <Code className="text-indigo-500"/> AI Task Verification
-          </h2>
-          <div className="mt-2 bg-orange-900/20 border border-orange-500/30 p-3 rounded-lg flex gap-2">
-             <AlertTriangle className="text-orange-500 shrink-0" size={16}/>
-             <p className="text-xs text-orange-200">
-               <strong>Strict Criteria:</strong> {task.requirements || "Standard logic check."}
-             </p>
-          </div>
-        </div>
+  // --- 2. GITHUB AUTO-COMMIT LOGIC ---
+  const handleCodingComplete = async (score, code, language) => {
+    // Only commit if they actually passed (Score 100)
+    if (score < 100) {
+      alert("Tests failed. You must pass all test cases (Score: 100/100) to verify this task.");
+      return;
+    }
 
-        <div className="p-6 space-y-4">
-          <textarea 
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            className="w-full h-40 bg-[#0A0A0A] border border-gray-800 rounded-xl p-4 text-sm font-mono text-gray-300 focus:border-indigo-500 outline-none resize-none"
-            placeholder="// Paste your specific solution for this task here..."
-          />
-          
-          {result === 'fail' && (
-             <div className="bg-red-900/20 border border-red-500/30 p-4 rounded-xl text-sm text-red-200">
-                <strong>Rejected:</strong> {feedback}
-             </div>
-          )}
-          {result === 'success' && (
-             <div className="bg-green-900/20 border border-green-500/30 p-4 rounded-xl text-sm text-green-200">
-                <strong>Accepted:</strong> {feedback}
-             </div>
-          )}
-        </div>
+    setIsCommitting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const providerToken = session?.provider_token;
 
-        <div className="p-4 border-t border-gray-800 flex justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 text-gray-400 hover:text-white">Cancel</button>
-          <button onClick={handleVerify} disabled={analyzing || result === 'success'} className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold flex items-center gap-2">
-            {analyzing ? <Loader2 className="animate-spin" size={18}/> : "Verify Code"}
-          </button>
-        </div>
+      if (!providerToken) throw new Error("GitHub Token Missing. Please click 'Connect GitHub' in the workspace.");
+
+      const username = session.user?.user_metadata?.user_name;
+      const repoName = "foxbird-internship-portfolio";
+      
+      if (!username) throw new Error("Could not find GitHub username.");
+
+      // Sanitize names for file path
+      const safeProject = (projectTitle || "Internship_Project").replace(/[^a-zA-Z0-9]/g, '_');
+      const safeTask = (task.title || "Task").replace(/[^a-zA-Z0-9]/g, '_');
+      
+      // Determine extension
+      const extMap = { 'python': 'py', 'java': 'java', 'cpp': 'cpp', 'javascript': 'js' };
+      const ext = extMap[language] || 'txt';
+      
+      const filePath = `${safeProject}/${safeTask}.${ext}`;
+      const message = `feat: Completed ${task.title}`;
+      const contentEncoded = btoa(code); // Base64 Encode
+
+      // A. Check if file exists (to get SHA for update)
+      let sha = null;
+      try {
+        const checkRes = await fetch(`https://api.github.com/repos/${username}/${repoName}/contents/${filePath}`, {
+             headers: { Authorization: `Bearer ${providerToken}` }
+        });
+        if (checkRes.ok) {
+            const fileData = await checkRes.json();
+            sha = fileData.sha;
+        }
+      } catch (e) {
+        console.warn("File check failed, assuming new file.");
+      }
+
+      // B. Create/Update File in GitHub
+      const commitRes = await fetch(`https://api.github.com/repos/${username}/${repoName}/contents/${filePath}`, {
+          method: 'PUT',
+          headers: { 
+              Authorization: `Bearer ${providerToken}`,
+              'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ message, content: contentEncoded, sha })
+      });
+
+      if (!commitRes.ok) {
+        if (commitRes.status === 404) throw new Error("Repo 'foxbird-internship-portfolio' not found. Please re-connect GitHub.");
+        throw new Error("GitHub API Error: " + commitRes.statusText);
+      }
+
+      // Success!
+      setCommitStatus('success');
+      // Wait a moment for the user to see "Success" then close
+      setTimeout(() => onSuccess(100), 1500); 
+
+    } catch (err) {
+      console.error(err);
+      alert("Commit Failed: " + err.message);
+      setIsCommitting(false);
+    }
+  };
+
+  // --- 3. RENDER ---
+  if (isCommitting) {
+    return (
+      <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-[60]">
+         <div className="text-center animate-in zoom-in-95">
+             {commitStatus === 'success' ? (
+                <>
+                  <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-[0_0_30px_rgba(34,197,94,0.6)]">
+                    <GitCommit className="text-white" size={32}/>
+                  </div>
+                  <h2 className="text-2xl font-bold text-white">Code Pushed to GitHub!</h2>
+                  <p className="text-gray-400 mt-2">Updating your portfolio...</p>
+                </>
+             ) : (
+                <>
+                   <Loader2 className="animate-spin text-indigo-500 mx-auto mb-4" size={48}/>
+                   <h2 className="text-2xl font-bold text-white">Syncing with GitHub...</h2>
+                   <p className="text-gray-400 mt-2">Committing your solution...</p>
+                </>
+             )}
+         </div>
       </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/95 z-50 flex flex-col">
+       {/* Simple Header Overlay */}
+       <div className="absolute top-4 right-4 z-50">
+          <button onClick={onClose} className="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white p-2 rounded-full transition-colors">
+             <X size={20}/>
+          </button>
+       </div>
+
+       {/* Reuse Your Coding Module */}
+       <CodingModule 
+          problems={[problemData]} 
+          onComplete={handleCodingComplete}
+          onCancel={onClose}
+          user={null} // Not needed for this context
+          sessionId={null} // Not needed
+          isEmbedded={true}
+       />
     </div>
   );
 }
