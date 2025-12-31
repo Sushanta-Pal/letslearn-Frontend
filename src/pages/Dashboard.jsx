@@ -1,16 +1,38 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { 
-  Code, Briefcase, Mic, CheckCircle, ArrowRight, 
-  Globe, Shield, Zap 
+import {
+  Code, Briefcase, Mic, CheckCircle, ArrowRight,
+  Globe, Shield, Zap, Menu, X
 } from "lucide-react";
 import { supabase } from "../supabaseClient";
-import MobileNav from "@/components/ui/MobileNav";
-import Loader from "../components/Loader";
-import dashboardShot from '../assets/dashboard-screenshot.png'; 
+import MobileNav from "@/components/ui/MobileNav"; // Ensure this path is correct
+import Loader from "../components/Loader"; // Ensure this path is correct
+import dashboardShot from '../assets/dashboard-screenshot.png'; // Ensure this path is correct
 
-import TrustedBy from "../components/TrustedBy"; 
-import PricingCard from "../components/PricingCard";
+// You might need these components if they exist, otherwise remove them
+ import TrustedBy from "../components/TrustedBy"; 
+ import PricingCard from "../components/PricingCard";
+
+// Simplified Pricing Card component for this file if not imported
+// const PricingCard = ({ tier, price, features, highlighted }) => (
+//   <div className={`p-8 rounded-3xl border flex flex-col h-full ${highlighted ? 'bg-[#111] border-[#FF4A1F] shadow-2xl shadow-orange-900/20' : 'bg-[#0A0A0A] border-gray-800'}`}>
+//     <h3 className="text-lg font-medium text-gray-400 mb-2">{tier}</h3>
+//     <div className="text-4xl font-bold text-white mb-6">
+//       ${price}<span className="text-lg text-gray-500 font-normal">/mo</span>
+//     </div>
+//     <ul className="space-y-4 mb-8 flex-1">
+//       {features.map((feat, i) => (
+//         <li key={i} className="flex items-start gap-3 text-sm text-gray-300">
+//           <CheckCircle size={16} className="text-[#FF4A1F] mt-0.5 shrink-0" />
+//           <span>{feat}</span>
+//         </li>
+//       ))}
+//     </ul>
+//     <button className={`w-full py-3 rounded-xl font-bold transition-all ${highlighted ? 'bg-[#FF4A1F] text-black hover:brightness-110' : 'bg-white text-black hover:bg-gray-200'}`}>
+//       Choose Plan
+//     </button>
+//   </div>
+// );
 
 export default function FoxBirdLanding() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -22,86 +44,81 @@ export default function FoxBirdLanding() {
   const extractRole = (session) => {
     if (!session || !session.user) return null;
     return (
-      session.user.app_metadata?.user_role || 
-      session.user.user_metadata?.user_role || 
+      session.user.app_metadata?.user_role ||
+      session.user.user_metadata?.user_role ||
       'Student'
     );
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
       setIsLoggedIn(!!session);
       setUserRole(extractRole(session));
-    });
+      setLoading(false);
+    };
+
+    checkSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsLoggedIn(!!session);
       setUserRole(extractRole(session));
     });
 
-    const timer = setTimeout(() => setLoading(false), 1500);
     return () => {
       subscription.unsubscribe();
-      clearTimeout(timer);
     };
   }, []);
 
   if (loading) return <Loader />;
 
   return (
-    <motion.div
-      className="min-h-screen bg-[#0A0A0A] text-white antialiased font-sans selection:bg-[#FF4A1F] selection:text-white"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.5 }}
-    >
+    <div className="min-h-screen bg-[#FDFDFD] text-[#111] antialiased font-sans selection:bg-[#FF4A1F] selection:text-white dark:bg-[#050505] dark:text-white transition-colors duration-300">
+      
       {/* --- NAVBAR --- */}
-      <header className="sticky top-0 z-50 backdrop-blur-md bg-black/80 border-b border-white/5">
-        <div className="max-w-[1400px] mx-auto px-6 py-4 flex items-center justify-between">
+      <header className="sticky top-0 z-50 bg-white/80 dark:bg-black/80 backdrop-blur-md border-b border-gray-200 dark:border-white/10">
+        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <a href="/" className="flex items-center gap-2 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FF4A1F] to-[#FF8C69] flex items-center justify-center font-bold text-black group-hover:rotate-12 transition-transform">
+            <div className="w-8 h-8 rounded-lg bg-[#FF4A1F] flex items-center justify-center font-bold text-white group-hover:rotate-12 transition-transform">
               FB
             </div>
-            <span className="font-bold text-lg tracking-tight">Fox Bird</span>
+            <span className="font-bold text-xl tracking-tight">Fox Bird</span>
           </a>
 
           {/* Desktop Nav */}
-          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-400">
-            <a href="#features" className="hover:text-white transition-colors">Platform</a>
-            <a href="#internships" className="hover:text-white transition-colors">Internships</a>
-            <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
+          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-600 dark:text-gray-300">
+            <a href="#features" className="hover:text-[#FF4A1F] transition-colors">Platform</a>
+            <a href="#internships" className="hover:text-[#FF4A1F] transition-colors">Internships</a>
+            <a href="#pricing" className="hover:text-[#FF4A1F] transition-colors">Pricing</a>
             
-            {/* Dynamic Dashboard Link */}
-            {isLoggedIn ? (
-              <a 
-                href="/profile" 
-                className="ml-4 px-5 py-2.5 bg-white text-black rounded-full font-bold hover:bg-gray-200 transition-all flex items-center gap-2"
-              >
-                Go to Dashboard <ArrowRight size={16}/>
-              </a>
-            ) : (
-              <div className="flex items-center gap-4 ml-4">
-                <a href="/login" className="hover:text-white">Login</a>
+            <div className="flex items-center gap-4 ml-4">
+              {isLoggedIn ? (
                 <a 
-                  href="/signup" 
-                  className="px-5 py-2.5 bg-[#FF4A1F] text-black rounded-full font-bold hover:brightness-110 transition-all shadow-lg shadow-orange-500/20"
+                  href="/profile" 
+                  className="px-5 py-2 bg-black dark:bg-white text-white dark:text-black rounded-lg font-semibold hover:opacity-90 transition-all flex items-center gap-2"
                 >
-                  Get Started
+                  Dashboard <ArrowRight size={16}/>
                 </a>
-              </div>
-            )}
+              ) : (
+                <>
+                  <a href="/login" className="hover:text-[#FF4A1F]">Login</a>
+                  <a 
+                    href="/signup" 
+                    className="px-5 py-2 bg-[#FF4A1F] text-white rounded-lg font-semibold hover:bg-[#e03e13] transition-all shadow-md shadow-orange-500/20"
+                  >
+                    Join Now
+                  </a>
+                </>
+              )}
+            </div>
           </nav>
 
           {/* Mobile Menu Toggle */}
           <button 
-            className="md:hidden text-white"
+            className="md:hidden text-gray-900 dark:text-white"
             onClick={() => setIsMobileNavOpen(!isMobileNavOpen)}
           >
-            <div className="space-y-1.5">
-              <span className={`block w-6 h-0.5 bg-white transition-transform ${isMobileNavOpen ? 'rotate-45 translate-y-2' : ''}`}></span>
-              <span className={`block w-6 h-0.5 bg-white transition-opacity ${isMobileNavOpen ? 'opacity-0' : ''}`}></span>
-              <span className={`block w-6 h-0.5 bg-white transition-transform ${isMobileNavOpen ? '-rotate-45 -translate-y-2' : ''}`}></span>
-            </div>
+            {isMobileNavOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
         </div>
         
@@ -109,283 +126,234 @@ export default function FoxBirdLanding() {
         <MobileNav open={isMobileNavOpen} onClose={() => setIsMobileNavOpen(false)} isLoggedIn={isLoggedIn} />
       </header>
 
-      {/* --- HERO SECTION --- */}
-      <section className="relative pt-16 pb-20 overflow-hidden">
-        {/* Background Gradients */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-[#FF4A1F]/10 rounded-full blur-[120px] -z-10" />
-        
-        <div className="max-w-[1400px] mx-auto px-6 text-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-[#FF4A1F] mb-6">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#FF4A1F] opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#FF4A1F]"></span>
-            </span>
-            Now hiring for Virtual Internships
-          </div>
+      <main className="max-w-7xl mx-auto px-6">
 
-          <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight leading-[1.1] mb-6">
-            Bridge the gap between <br className="hidden md:block"/>
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FF4A1F] to-[#FF8C69]">College & Corporate</span>
-          </h1>
+        {/* --- HERO SECTION --- */}
+        <section className="pt-24 pb-20 text-center relative">
+          {/* Subtle Background Blob */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-gradient-to-b from-[#FF4A1F]/10 to-transparent rounded-full blur-[100px] -z-10 pointer-events-none" />
 
-          <p className="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto mb-10">
-            Stop watching tutorials. Start building. Join AI-powered internships, 
-            get code reviews from senior bots, and earn verified certificates.
-          </p>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
-            <a 
-              href={isLoggedIn ? "/profile" : "/signup"}
-              className="px-8 py-4 bg-white text-black rounded-full font-bold text-lg hover:bg-gray-100 transition-all flex items-center gap-2"
-            >
-              Start Your Career <ArrowRight size={20}/>
-            </a>
-            <a 
-              href="#features"
-              className="px-8 py-4 bg-white/5 border border-white/10 text-white rounded-full font-bold text-lg hover:bg-white/10 transition-all"
-            >
-              Explore Features
-            </a>
-          </div>
-
-          {/* Hero Visual Dashboard Preview (FIXED IMAGE SCALING) */}
-          <div className="relative mx-auto max-w-6xl">
-  {/* top fade */}
-  <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-transparent to-transparent z-10 pointer-events-none" />
-
-  <div className="rounded-xl border border-white/10 bg-[#111] p-2 shadow-2xl">
-    <div className="rounded-lg overflow-hidden bg-[#0A0A0A]">
-      
-      <div className="relative w-full h-auto group">
-        {/* Screenshot */}
-        <img
-          src={dashboardShot}
-          alt="Internship Workspace Screenshot"
-          className="
-            w-full h-auto object-contain
-            transition-all duration-700 ease-out
-            group-hover:scale-[1.01]
-          "
-        />
-
-        {/* 🔥 Overlay Content */}
-        <div className="absolute inset-0 flex items-end justify-center z-20 pointer-events-none">
-          <div
-            className="
-              mb-6
-              backdrop-blur-md bg-black/50
-              px-8 py-5
-              rounded-2xl
-              border border-white/10
-              text-center
-              shadow-xl
-              transition-all duration-700
-              group-hover:translate-y-[-6px]
-              group-hover:bg-black/60
-            "
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="max-w-4xl mx-auto"
           >
-            <div className="w-14 h-14 bg-[#FF4A1F] rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg shadow-orange-500/40">
-              <Briefcase className="text-black" size={28} />
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-500/20 text-xs font-bold text-[#FF4A1F] mb-8">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#FF4A1F] opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#FF4A1F]"></span>
+              </span>
+              Now hiring for Virtual Internships
             </div>
 
-            <h3 className="text-xl md:text-2xl font-bold text-white">
-              Internship Workspace
-            </h3>
+            <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight leading-[1.1] mb-6 text-gray-900 dark:text-white">
+              Build your career <br />
+              <span className="text-[#FF4A1F]">in the real world.</span>
+            </h1>
 
-            <p className="text-gray-300 text-sm md:text-base mt-1">
-              Kanban Board • Code Review • Repo Sync
+            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto mb-10 leading-relaxed">
+              Join an inclusive global community for anyone passionate about technology. 
+              We foster collaboration, innovation, and career growth through virtual internships.
             </p>
-          </div>
-        </div>
 
-      </div>
-    </div>
-  </div>
-</div>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-20">
+              <a 
+                href={isLoggedIn ? "/profile" : "/signup"}
+                className="px-8 py-4 bg-[#FF4A1F] text-white rounded-xl font-bold text-lg hover:bg-[#e03e13] transition-all shadow-xl shadow-orange-500/20 flex items-center gap-2"
+              >
+                Start Learning <ArrowRight size={20}/>
+              </a>
+              <a 
+                href="#features"
+                className="px-8 py-4 bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white rounded-xl font-bold text-lg hover:bg-gray-200 dark:hover:bg-white/20 transition-all"
+              >
+                Learn More
+              </a>
+            </div>
 
-        </div>
-      </section>
+            {/* Hero Image / Dashboard Preview */}
+            <div className="relative rounded-2xl overflow-hidden border border-gray-200 dark:border-white/10 shadow-2xl">
+              <div className="absolute inset-0 bg-gradient-to-t from-white dark:from-[#050505] via-transparent to-transparent z-10 pointer-events-none h-40 bottom-0 top-auto" />
+              <img 
+                src={dashboardShot} 
+                alt="Dashboard Preview" 
+                className="w-full h-auto object-cover transform transition-transform hover:scale-[1.02] duration-700"
+              />
+            </div>
+          </motion.div>
+        </section>
 
-     
-     
-
-      {/* --- FEATURES GRID --- */}
-      <section id="features" className="py-20 bg-[#0A0A0A]">
-        <div className="max-w-[1400px] mx-auto px-6">
+        {/* --- FEATURES GRID (Bento Style) --- */}
+        <section id="features" className="py-20">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-5xl font-bold mb-4">Complete Career Ecosystem</h2>
-            <p className="text-gray-400 max-w-2xl mx-auto">We don't just teach syntax. We simulate the entire job experience so you are ready for Day 1.</p>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4 text-gray-900 dark:text-white">Everything you need to grow</h2>
+            <p className="text-gray-600 dark:text-gray-400">A complete ecosystem designed to take you from student to professional.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <FeatureCard 
-              icon={<Briefcase className="text-[#FF4A1F]" size={28} />}
+              icon={<Briefcase className="text-white" size={24} />}
+              color="bg-[#FF4A1F]"
               title="Virtual Internships"
-              desc="Work on real-world tasks (e.g. 'Fix Auth Bug'). Use a Kanban board, submit PRs, and get promoted from Intern to Architect."
+              desc="Work on real-world tasks. Use a Kanban board, submit PRs, and get promoted."
             />
             <FeatureCard 
-              icon={<Mic className="text-purple-500" size={28} />}
+              icon={<Mic className="text-white" size={24} />}
+              color="bg-purple-600"
               title="AI Mock Interviews"
-              desc="Speak your answers. Our AI analyzes your voice, confidence, and technical accuracy to give you a hiring score instantly."
+              desc="Practice speaking confidently. Get instant AI analysis on your answers."
             />
             <FeatureCard 
-              icon={<Code className="text-green-500" size={28} />}
+              icon={<Code className="text-white" size={24} />}
+              color="bg-green-600"
               title="Coding Arena"
-              desc="Solve DSA problems and build mini-projects in our browser-based IDE. Earn coins and badges for every passing test case."
+              desc="Solve DSA problems in our IDE. Earn coins for every passing test case."
             />
             <FeatureCard 
-              icon={<Zap className="text-yellow-500" size={28} />}
+              icon={<Zap className="text-white" size={24} />}
+              color="bg-yellow-500"
               title="Instant Feedback"
-              desc="No waiting for mentors. Our AI Senior Architect reviews your code line-by-line and rejects lazy submissions immediately."
+              desc="No waiting. Our AI Senior Architect reviews your code line-by-line."
             />
             <FeatureCard 
-              icon={<Globe className="text-blue-500" size={28} />}
+              icon={<Globe className="text-white" size={24} />}
+              color="bg-blue-600"
               title="Global Leaderboard"
-              desc="Compete with thousands of students. Climb the ranks based on XP earned from internships and challenges."
+              desc="Compete with thousands. Climb ranks based on XP earned."
             />
             <FeatureCard 
-              icon={<Shield className="text-red-500" size={28} />}
+              icon={<Shield className="text-white" size={24} />}
+              color="bg-red-600"
               title="Verified Certificates"
-              desc="Earn credentials that actually matter. Download PDF certificates with unique IDs upon project completion."
+              desc="Earn credentials that matter. Download PDF certificates with unique IDs."
             />
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* --- INTERNSHIP PREVIEW SECTION --- */}
-      <section id="internships" className="py-20 bg-[#0F0F10] relative overflow-hidden">
-        <div className="max-w-[1400px] mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-          <div>
-            <div className="inline-block px-3 py-1 bg-orange-500/10 text-[#FF4A1F] rounded-full text-sm font-bold mb-4 border border-orange-500/20">
-              Simulation Engine
-            </div>
-            <h2 className="text-4xl font-bold mb-4">Experience the Job <br/> Before You Get the Job.</h2>
-            <p className="text-gray-400 text-lg mb-6">
-              Fox Bird gives you a workspace that mimics top tech companies. You don't just watch videos; you move tickets, write code, and push to production.
-            </p>
+        {/* --- INTERNSHIPS HIGHLIGHT --- */}
+        <section id="internships" className="py-20">
+          <div className="bg-[#111] dark:bg-[#111] rounded-[2.5rem] p-8 md:p-16 text-white relative overflow-hidden">
+            {/* Decorative circles */}
+            <div className="absolute top-0 right-0 w-96 h-96 bg-[#FF4A1F]/20 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/2 pointer-events-none" />
             
-            <ul className="space-y-3 mb-8">
-              {[
-                "Kanban Board Task Management",
-                "Strict 'Senior Dev' AI Code Review",
-                "Automated XP & Coin Rewards",
-                "GitHub Repository Integration"
-              ].map((item, i) => (
-                <li key={i} className="flex items-center gap-3">
-                  <div className="w-6 h-6 rounded-full bg-[#FF4A1F]/20 flex items-center justify-center">
-                    <CheckCircle size={14} className="text-[#FF4A1F]" />
-                  </div>
-                  <span className="text-gray-300">{item}</span>
-                </li>
-              ))}
-            </ul>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center relative z-10">
+              <div>
+                <div className="inline-block px-4 py-1.5 bg-[#FF4A1F] rounded-full text-sm font-bold mb-6 text-white">
+                  Simulation Engine v2.0
+                </div>
+                <h2 className="text-4xl md:text-5xl font-bold mb-6 leading-tight">
+                  Experience the job <br/> before you get the job.
+                </h2>
+                <p className="text-gray-300 text-lg mb-8 leading-relaxed">
+                  Fox Bird mimics a top-tier tech company workspace. You don't just watch videos; you move Jira tickets, write production code, submit Pull Requests, and debug live issues.
+                </p>
+                
+                <ul className="space-y-4 mb-10">
+                  {[
+                    "Kanban Board Task Management",
+                    "Strict 'Senior Dev' AI Code Review",
+                    "Automated XP & Coin Rewards",
+                    "GitHub Repository Integration"
+                  ].map((item, i) => (
+                    <li key={i} className="flex items-center gap-3">
+                      <div className="w-6 h-6 rounded-full bg-white flex items-center justify-center shrink-0">
+                        <CheckCircle size={14} className="text-[#111]" />
+                      </div>
+                      <span className="text-gray-200 font-medium">{item}</span>
+                    </li>
+                  ))}
+                </ul>
 
-            <a href="/student/internships" className="px-8 py-3 bg-[#FF4A1F] text-black font-bold rounded-full hover:brightness-110 transition-all">
-              View Available Roles
-            </a>
-          </div>
+                <a href="/student/internships" className="inline-block px-8 py-4 bg-white text-black font-bold rounded-xl hover:bg-gray-100 transition-all">
+                  View Available Roles
+                </a>
+              </div>
 
-          <div className="relative">
-            {/* Visual Representation of Kanban/IDE */}
-            <div className="bg-[#1a1a1a] rounded-2xl p-6 border border-white/5 shadow-2xl relative z-10 rotate-1 hover:rotate-0 transition-transform duration-500">
-               <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
-                  <div className="flex gap-2">
-                     <div className="w-3 h-3 rounded-full bg-red-500"/>
-                     <div className="w-3 h-3 rounded-full bg-yellow-500"/>
-                     <div className="w-3 h-3 rounded-full bg-green-500"/>
+              {/* IDE Visual */}
+              <div className="relative">
+                <div className="bg-[#1A1A1A] rounded-2xl border border-white/10 shadow-2xl overflow-hidden transform rotate-2 hover:rotate-0 transition-all duration-500">
+                  {/* Fake IDE Header */}
+                  <div className="bg-[#222] p-3 flex gap-2 border-b border-white/5">
+                    <div className="w-3 h-3 rounded-full bg-red-500" />
+                    <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                    <div className="w-3 h-3 rounded-full bg-green-500" />
                   </div>
-                  <div className="text-xs text-gray-500 font-mono">FoxBird Workspace v2.0</div>
-               </div>
-               
-               <div className="flex gap-4">
-                  {/* Fake Kanban Columns */}
-                  <div className="w-1/3 bg-[#111] rounded-lg p-3 space-y-3">
-                     <div className="text-xs text-gray-500 font-bold uppercase">To Do</div>
-                     <div className="bg-[#222] p-3 rounded text-xs border-l-2 border-orange-500">Fix Login API</div>
-                     <div className="bg-[#222] p-3 rounded text-xs border-l-2 border-orange-500">Setup Database</div>
+                  {/* Fake Code Content */}
+                  <div className="p-6 font-mono text-sm space-y-2 text-gray-300">
+                    <div className="flex gap-4"><span className="text-gray-600">1</span> <span className="text-purple-400">const</span> <span className="text-blue-400">submitPR</span> = <span className="text-purple-400">async</span> () ={">"} {"{"}</div>
+                    <div className="flex gap-4"><span className="text-gray-600">2</span> &nbsp;&nbsp;<span className="text-purple-400">await</span> github.<span className="text-yellow-400">push</span>(code);</div>
+                    <div className="flex gap-4"><span className="text-gray-600">3</span> &nbsp;&nbsp;<span className="text-gray-500">// AI Review running...</span></div>
+                    <div className="flex gap-4"><span className="text-gray-600">4</span> &nbsp;&nbsp;<span className="text-green-400">return</span> <span className="text-orange-400">"Approved"</span>;</div>
+                    <div className="flex gap-4"><span className="text-gray-600">5</span> {"}"}</div>
                   </div>
-                  <div className="w-1/3 bg-[#111] rounded-lg p-3 space-y-3">
-                     <div className="text-xs text-gray-500 font-bold uppercase">In Progress</div>
-                     <div className="bg-[#222] p-3 rounded text-xs border-l-2 border-blue-500">
-                        Design Home Page
-                        <div className="mt-2 h-1 w-full bg-gray-700 rounded-full overflow-hidden">
-                           <div className="h-full bg-blue-500 w-2/3"></div>
-                        </div>
-                     </div>
+                  {/* Fake Console */}
+                  <div className="bg-black p-4 border-t border-white/10 text-xs font-mono">
+                    <div className="text-green-400">{">"} Tests passed: 12/12</div>
+                    <div className="text-blue-400">{">"} Deploying to production...</div>
+                    <div className="text-white animate-pulse">{">"} _</div>
                   </div>
-                  <div className="w-1/3 bg-[#111] rounded-lg p-3 space-y-3">
-                     <div className="text-xs text-gray-500 font-bold uppercase">Done</div>
-                     <div className="bg-[#222] p-3 rounded text-xs border-l-2 border-green-500 flex justify-between items-center">
-                        <span>Deploy App</span>
-                        <CheckCircle size={12} className="text-green-500"/>
-                     </div>
-                  </div>
-               </div>
+                </div>
+              </div>
             </div>
-            
-            {/* Background Blob */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-[#FF4A1F]/20 blur-[100px] -z-10 rounded-full"></div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* --- PRICING SECTION --- */}
-      <section id="pricing" className="py-20 bg-[#0A0A0A]">
-        <div className="max-w-[1400px] mx-auto px-6 text-center">
-          <h2 className="text-3xl font-bold mb-10">Invest in Your Career</h2>
-          <div className="flex flex-wrap gap-6 justify-center">
-            {/* Simplified Pricing Cards for Layout */}
+        {/* --- PRICING --- */}
+        <section id="pricing" className="py-20">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4 text-gray-900 dark:text-white">Invest in your future</h2>
+            <p className="text-gray-600 dark:text-gray-400">Simple, transparent pricing. No hidden fees.</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             <PricingCard 
-               tier="Free Tier" 
-               price="0" 
-               features={["Access to Practice Arena", "1 Mock Interview", "Community Support"]} 
+              tier="Free Tier" 
+              price="0" 
+              features={["Access to Practice Arena", "1 Mock Interview", "Community Support"]} 
             />
             <PricingCard 
-               tier="Pro Intern" 
-               price="499" 
-               highlighted={true}
-               features={["Unlimited Internships", "AI Code Reviews", "Verified Certificates", "Priority Support"]} 
+              tier="Pro Intern" 
+              price="49" 
+              highlighted={true}
+              features={["Unlimited Internships", "AI Code Reviews", "Verified Certificates", "Priority Support"]} 
             />
             <PricingCard 
-               tier="Lifetime" 
-               price="2999" 
-               features={["Lifetime Access", "1-on-1 Mentorship", "Job Referrals", "Private Discord"]} 
+              tier="Lifetime" 
+              price="299" 
+              features={["Lifetime Access", "1-on-1 Mentorship", "Job Referrals", "Private Discord"]} 
             />
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* --- CTA FOOTER --- */}
-      <section className="py-16 border-t border-white/10 bg-[#050505]">
-        <div className="max-w-4xl mx-auto px-6 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-6">Ready to become a Senior Dev?</h2>
-          <p className="text-gray-400 mb-8 text-lg">
-            Join the community of developers who are learning by doing. No more passive watching.
-          </p>
-          <a href="/signup" className="inline-block px-10 py-4 bg-white text-black font-bold text-xl rounded-full hover:scale-105 transition-transform">
-            Get Started Now
-          </a>
-        </div>
-      </section>
+      </main>
 
       {/* --- FOOTER --- */}
-      <footer className="bg-black py-8 border-t border-white/5 text-center text-gray-600 text-sm">
-        <p>&copy; 2025 Fox Bird (Motia). All rights reserved.</p>
+      <footer className="bg-white dark:bg-[#050505] border-t border-gray-200 dark:border-white/10 py-12 mt-12">
+        <div className="max-w-7xl mx-auto px-6 text-center">
+          <div className="flex justify-center items-center gap-2 mb-6">
+            <div className="w-8 h-8 rounded-lg bg-[#111] dark:bg-white text-white dark:text-black flex items-center justify-center font-bold">FB</div>
+            <span className="font-bold text-xl text-gray-900 dark:text-white">Fox Bird</span>
+          </div>
+          <p className="text-gray-500 text-sm">
+            &copy; 2025 Fox Bird. Built for the builders.
+          </p>
+        </div>
       </footer>
 
-    </motion.div>
+    </div>
   );
 }
 
-// --- HELPER COMPONENT: FEATURE CARD ---
-function FeatureCard({ icon, title, desc }) {
+// --- HELPER COMPONENT: FEATURE CARD (Updated Style) ---
+function FeatureCard({ icon, title, desc, color }) {
   return (
-    <div className="p-6 rounded-2xl bg-[#111] border border-white/5 hover:border-white/10 hover:bg-[#161616] transition-all group">
-      <div className="w-12 h-12 bg-black rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform border border-white/5">
+    <div className="p-8 rounded-3xl bg-white dark:bg-[#111] border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 transition-all hover:shadow-xl group">
+      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-6 shadow-md ${color}`}>
         {icon}
       </div>
-      <h3 className="text-xl font-bold mb-2 text-white">{title}</h3>
-      <p className="text-gray-400 text-sm leading-relaxed">{desc}</p>
+      <h3 className="text-xl font-bold mb-3 text-gray-900 dark:text-white">{title}</h3>
+      <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">{desc}</p>
     </div>
   );
 }

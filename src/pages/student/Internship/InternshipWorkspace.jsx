@@ -69,7 +69,7 @@ const InternshipWorkspace = ({ user }) => {
 
   const createInternshipRepo = async (token, username) => {
     setRepoStatus('creating');
-    const repoName = "foxbird-internship-portfolio";
+    const repoName = "foxbird-internship";
 
     try {
         // Step A: Check if repo exists
