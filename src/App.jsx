@@ -6,14 +6,15 @@ import { supabase } from './supabaseClient';
 // Pages
 import LoginPage from "./pages/LoginPage";
 import SignUpPage from "./pages/SignUpPage";
-import DashboardLanding from "./pages/Dashboard"; // The Public Landing Page
+import DashboardLanding from "./pages/Dashboard"; 
 import AssignmentManager from "./pages/Teacher/AssignmentManager";
 import StudentAssignmentView from "./pages/student/StudentAssignmentView";
+
 // Layouts
 import DashboardLayout from "./layouts/DashboardLayout";
 
-// Student Views (Formerly Tabs in ProfilePage)
-import DashboardOverview from "./pages/student/DashboardOverview"; // NEW FILE (See below)
+// Student Views
+import DashboardOverview from "./pages/student/DashboardOverview";
 import CoursesList from "./pages/student/CoursesList";
 import QuestionListPage from "./pages/student/QuestionList";
 import InternshipDashboard from "./pages/student/Internship/InternshipDashboard";
@@ -48,17 +49,20 @@ function AnimatedRoutes() {
 
         {/* PROTECTED DASHBOARD ROUTES (Wrapped in Layout) */}
         <Route path="/dashboard" element={<DashboardLayout />}>
-           {/* The "Index" is the Overview (Stats, Bento Grid) */}
+           {/* The "Index" is the Overview */}
            <Route index element={<motion.div {...pageMotionProps}><DashboardOverview /></motion.div>} />
            
-           {/* Clean sub-routes */}
+           {/* Student Routes */}
            <Route path="courses" element={<motion.div {...pageMotionProps}><CoursesList /></motion.div>} />
            <Route path="internships" element={<motion.div {...pageMotionProps}><InternshipDashboard /></motion.div>} />
-           <Route path="assignments" element={<motion.div {...pageMotionProps}><StudentAssignmentView /></motion.div>} />
+           
+           {/* CORRECTED ASSIGNMENTS ROUTE (Removed the duplicate) */}
+           <Route path="assignments" element={<motion.div {...pageMotionProps}><StudentAssignmentViewWrapper /></motion.div>} />
+           
            <Route path="interviews" element={<motion.div {...pageMotionProps}><MockInterviewWrapper /></motion.div>} />
            <Route path="practice" element={<motion.div {...pageMotionProps}><QuestionListPage /></motion.div>} />
-           <Route path="assignments" element={<motion.div {...pageMotionProps}><StudentAssignmentViewWrapper /></motion.div>} />
-           {/* Teacher Specific Routes (Can add role checks inside components) */}
+           
+           {/* Teacher Specific Routes */}
            <Route path="teacher/create-internship" element={<CreateInternship />} />
            <Route path="teacher/add-question" element={<AddQuestionPage />} />
            <Route path="teacher/manage-courses" element={<ManageCourses />} />
@@ -71,20 +75,35 @@ function AnimatedRoutes() {
         <Route path="/student/solve/:questionId" element={<SolveProblemPage />} />
         <Route path="/student/mock-interview/:sessionId" element={<MockInterviewSessionWrapper />} />
 
-        {/* Redirect old routes */}
+        {/* Redirects */}
         <Route path="/profile" element={<Navigate to="/dashboard" replace />} />
-
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </AnimatePresence>
   );
 }
+
+// --- WRAPPERS ---
+
+// 1. Assignment Wrapper (Fixes the "User is undefined" error)
 function StudentAssignmentViewWrapper() {
     const [user, setUser] = useState(null);
-    useEffect(() => { supabase.auth.getUser().then(({data}) => setUser(data.user)) }, []);
-    if(!user) return null;
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => { 
+        supabase.auth.getUser().then(({data}) => {
+            setUser(data.user);
+            setLoading(false);
+        });
+    }, []);
+
+    if (loading) return <div className="p-10 text-white text-center">Loading User...</div>;
+    if (!user) return <div className="p-10 text-white text-center">Please Log In</div>;
+    
     return <StudentAssignmentView user={user} />;
 }
-// --- WRAPPERS ---
+
+// 2. Internship Workspace Wrapper
 function InternshipWorkspaceWrapper() {
     const [user, setUser] = useState(null);
     const { projectId } = useParams();
@@ -93,8 +112,8 @@ function InternshipWorkspaceWrapper() {
     return <InternshipWorkspace user={user} projectId={projectId} />;
 }
 
+// 3. Mock Interview Wrappers
 function MockInterviewWrapper() {
-  // Just the landing page for interviews
   const [user, setUser] = useState(null);
   useEffect(() => { supabase.auth.getUser().then(({data}) => setUser(data.user)) }, []);
   if(!user) return null;
