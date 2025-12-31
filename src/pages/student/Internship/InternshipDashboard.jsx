@@ -77,18 +77,26 @@ const InternshipDashboard = () => {
         const submission = subMap.get(project.id);
         const qualifier = qualMap.get(project.qualifying_set_id);
 
+       
+        
         // Determine UI State
         let uiState = 'APPLY';
         
         if (submission) {
-            // PRIORITY: Check specific statuses from your DB
+            // Check specific statuses from your DB
             if (submission.status === 'completed') uiState = 'DONE';
             else if (submission.is_paid === true || submission.status === 'hired') uiState = 'WORK';
             else if (submission.status === 'qualified') uiState = 'OFFER';
             else uiState = 'APPLIED'; 
         } else if (qualifier) {
-            const passed = qualifier.technical_score >= 60 && qualifier.coding_score >= 60;
-            if (!passed) uiState = 'REJECTED'; 
+            // CHECK SCORES
+            const passed = (qualifier.technical_score || 0) >= 60 && (qualifier.coding_score || 0) >= 60;
+            
+            if (passed) {
+                uiState = 'OFFER'; // <--- THIS LINE WAS MISSING
+            } else {
+                uiState = 'REJECTED'; 
+            }
         }
 
         const projectData = { ...project, uiState, submission };
