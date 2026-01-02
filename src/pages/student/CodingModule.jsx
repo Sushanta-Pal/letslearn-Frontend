@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { 
   Play, Send, CheckCircle, XCircle, 
-  Code, Cpu, Clock, Terminal, AlertTriangle, Sparkles, Zap, FileCode 
+  Code, Cpu, Clock, Terminal, AlertTriangle, Sparkles, Zap, FileCode, GripVertical 
 } from "lucide-react";
-import { supabase } from "../../supabaseClient";
 
 // --- FALLBACK DATA ---
 const FALLBACK_PROBLEMS = [
@@ -29,7 +28,7 @@ const LANGUAGE_VERSIONS = {
 
 const CodingModule = ({ user, sessionId, onComplete, onCancel, problems, isEmbedded = false }) => {
   
-  // 1. NORMALIZE DATA
+  // --- 1. DATA & STATE ---
   const activeProblem = useMemo(() => {
     const raw = (problems && problems.length > 0) ? problems[0] : FALLBACK_PROBLEMS[0];
     return {
@@ -39,7 +38,14 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems, isEmbed
     };
   }, [problems]);
 
-  const [language, setLanguage] = useState("java");
+  // FIX: Auto-detect language from available starter code (Avoids Java default for Python problems)
+  const [language, setLanguage] = useState(() => {
+     if (activeProblem.starterCode?.java) return 'java';
+     if (activeProblem.starterCode?.python) return 'python';
+     if (activeProblem.starterCode?.cpp) return 'cpp';
+     return 'java';
+  });
+
   const [code, setCode] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [consoleOutput, setConsoleOutput] = useState(null); 
@@ -47,12 +53,15 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems, isEmbed
   const [finalStatus, setFinalStatus] = useState(null); 
   const [timeLeft, setTimeLeft] = useState(45 * 60);
   
-  // Resizable panels
+  // --- 2. LAYOUT RESIZING STATE ---
+  const containerRef = useRef(null); 
+  const rightPanelRef = useRef(null); 
   const [leftPanelWidth, setLeftPanelWidth] = useState(40);
-  const [consoleHeight, setConsoleHeight] = useState(224);
-  const [isDraggingVertical, setIsDraggingVertical] = useState(false);
-  const [isDraggingHorizontal, setIsDraggingHorizontal] = useState(false); 
+  const [consoleHeight, setConsoleHeight] = useState(250);
+  const [isDraggingSplit, setIsDraggingSplit] = useState(false);
+  const [isDraggingConsole, setIsDraggingConsole] = useState(false);
 
+  // --- 3. INIT CODE & TIMER ---
   useEffect(() => {
     const initialCode = activeProblem.starterCode?.[language] || getDefaultStarterCode(language);
     setCode(initialCode);
@@ -68,22 +77,70 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems, isEmbed
     return () => clearInterval(timer);
   }, []);
 
-  // Drag Handlers (Omitted for brevity, assume same as before)
-  // ... (Keep your existing drag useEffects here) ... 
-  
-  // Piston Execution Logic
-  const getDefaultStarterCode = (lang) => {
-    if(lang === 'java') return `public class Main {\n    public static void main(String[] args) {\n        // Write your code here\n    }\n}`;
-    if(lang === 'python') return `# Write your code here\nimport sys\n`;
-    if(lang === 'cpp') return `#include <iostream>\nusing namespace std;\nint main() {\n    // Write code here\n    return 0;\n}`;
-    return "";
+  // --- 4. RESIZING LOGIC ---
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+        if (isDraggingSplit && containerRef.current) {
+            e.preventDefault(); 
+            const containerRect = containerRef.current.getBoundingClientRect();
+            const newWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100;
+            if (newWidth > 20 && newWidth < 70) setLeftPanelWidth(newWidth);
+        }
+        if (isDraggingConsole && rightPanelRef.current) {
+            e.preventDefault();
+            const containerRect = rightPanelRef.current.getBoundingClientRect();
+            const newHeight = containerRect.bottom - e.clientY;
+            if (newHeight > 40 && newHeight < (containerRect.height * 0.8)) setConsoleHeight(newHeight);
+        }
+    };
+    const handleMouseUp = () => { setIsDraggingSplit(false); setIsDraggingConsole(false); };
+
+    if (isDraggingSplit || isDraggingConsole) {
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+        document.body.style.cursor = isDraggingSplit ? 'col-resize' : 'row-resize';
+        document.body.style.userSelect = 'none'; // Prevent highlighting
+    }
+    return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+        document.body.style.cursor = 'default';
+        document.body.style.userSelect = 'auto';
+    };
+  }, [isDraggingSplit, isDraggingConsole]);
+
+  // --- 5. EDITOR HANDLERS ---
+  const handleKeyDown = (e) => {
+    if (e.key === 'Tab') {
+        e.preventDefault();
+        const start = e.target.selectionStart;
+        const end = e.target.selectionEnd;
+        const newValue = code.substring(0, start) + "    " + code.substring(end);
+        setCode(newValue);
+        setTimeout(() => { e.target.selectionStart = e.target.selectionEnd = start + 4; }, 0);
+    }
   };
 
-  const handleLanguageChange = (e) => setLanguage(e.target.value);
+  const handlePaste = (e) => {
+    e.preventDefault();
+    alert("⚠️ Pasting is disabled in the Coding Arena.");
+  };
+
+ const getDefaultStarterCode = (lang) => {
+    // Force 'Main' class structure with necessary imports
+    if(lang === 'java') return `import java.util.*;\nimport java.io.*;\n\npublic class Main {\n    public static void main(String[] args) {\n        // Your code starts here\n        // Do not change 'public class Main'\n    }\n}`;
+    
+    if(lang === 'python') return `# Write your code here\nimport sys\n`;
+    if(lang === 'cpp') return `#include <iostream>\nusing namespace std;\n\nint main() {\n    // Write code here\n    return 0;\n}`;
+    return "";
+  };
 
   const executeCode = async (codeToRun, inputData) => {
     const config = LANGUAGE_VERSIONS[language];
     try {
+      // FIX: Ensure input is always a string to prevent API crashes on Numbers
+      const safeInput = (inputData !== undefined && inputData !== null) ? String(inputData) : "";
+      
       const response = await fetch("https://emkc.org/api/v2/piston/execute", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -91,7 +148,7 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems, isEmbed
           language: config.language,
           version: config.version,
           files: [{ name: config.file, content: codeToRun }],
-          stdin: inputData, 
+          stdin: safeInput,
         }),
       });
       return await response.json();
@@ -100,57 +157,83 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems, isEmbed
     }
   };
 
+  // --- 7. ROBUST RUN LOGIC (Fixes Data Flow Bugs) ---
   const handleRun = async () => {
     if (!activeProblem.testCases || activeProblem.testCases.length === 0) {
-        alert("This problem has no test cases configured. Cannot run tests.");
+        alert("This problem has no test cases configured.");
         return;
     }
     setIsRunning(true);
     setConsoleOutput(null);
     setTestResults([]);
     setFinalStatus(null);
+    if (consoleHeight < 100) setConsoleHeight(250);
 
     const results = [];
-    let allPassed = true;
-    let runtimeError = null;
+    let errorMessage = null;
 
     for (let i = 0; i < activeProblem.testCases.length; i++) {
         const testCase = activeProblem.testCases[i];
         const apiResult = await executeCode(code, testCase.input); 
 
-        if (!apiResult || !apiResult.run) { runtimeError = "API Connection Failed"; break; }
-        if (apiResult.run.stderr) { runtimeError = apiResult.run.stderr; break; }
+        // 1. Check API
+        if (!apiResult) { errorMessage = "API Connection Failed."; break; }
 
-        const actualOutput = apiResult.run.stdout ? apiResult.run.stdout.trim() : "";
-        const expectedOutput = testCase.expected ? testCase.expected.trim() : "";
+        // 2. Check Compilation
+        if (apiResult.compile && apiResult.compile.code !== 0) {
+            errorMessage = `Compilation Error:\n${apiResult.compile.stderr}`;
+            break;
+        }
+
+        // 3. Check Timeout
+        if (apiResult.run && (apiResult.run.signal === 'SIGKILL' || apiResult.run.signal === 'SIGTERM')) {
+            errorMessage = `Time Limit Exceeded on Test Case ${i+1}.\nCheck for infinite loops.`;
+            break;
+        }
+
+        // 4. Check Runtime
+        if (apiResult.run && apiResult.run.stderr) { 
+            errorMessage = `Runtime Error:\n${apiResult.run.stderr}`; 
+            break; 
+        }
+
+        // 5. VALIDATE OUTPUT (Fixed Data Flow)
+        const actualOutput = apiResult.run && apiResult.run.stdout ? apiResult.run.stdout.trim() : "";
+        
+        // FIX: Handle "0" and Numbers safely using String() conversion
+        const expectedRaw = testCase.expected;
+        const expectedOutput = (expectedRaw !== undefined && expectedRaw !== null) 
+            ? String(expectedRaw).trim() 
+            : "";
+            
         const passed = actualOutput === expectedOutput;
-        if (!passed) allPassed = false;
-
+        
         results.push({
             caseIndex: i + 1,
             input: testCase.input,
-            expected: testCase.expected,
+            expected: expectedOutput, // Show the string version
             actual: actualOutput,
             passed: passed
         });
     }
 
     setIsRunning(false);
-    if (runtimeError) {
+
+    if (errorMessage) {
         setFinalStatus("Error");
-        setConsoleOutput(runtimeError);
+        setConsoleOutput(errorMessage);
     } else {
+        const allPassed = results.every(r => r.passed);
         setTestResults(results);
         setFinalStatus(allPassed ? "Accepted" : "Wrong Answer");
     }
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (finalStatus !== "Accepted") {
         if(!confirm("Your code has not passed all test cases. Submit anyway?")) return;
     }
     const score = finalStatus === "Accepted" ? 100 : 0;
-    // ... (Keep your existing submit logic) ...
     onComplete(score, code, language);
   };
 
@@ -161,111 +244,99 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems, isEmbed
   };
 
   return (
-    <div className={`flex flex-col bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 overflow-hidden 
-        ${isEmbedded 
-            ? 'h-full w-full rounded-none border-none shadow-none'  // Modal Mode: Fill parent
-            : 'h-[calc(100vh-100px)] rounded-3xl shadow-2xl border border-slate-800/50' // Page Mode
-        }`}>
+    <div className={`flex flex-col bg-[#050505] overflow-hidden ${isEmbedded ? 'h-full w-full' : 'h-[calc(100vh-100px)] rounded-3xl border border-white/10 shadow-2xl'}`}>
       
       {/* TOOLBAR */}
-      <div className="h-16 bg-gradient-to-r from-slate-900/95 via-slate-800/95 to-slate-900/95 backdrop-blur-xl border-b border-slate-700/50 flex items-center justify-between px-6 shadow-lg shrink-0">
+      <div className="h-16 bg-[#0A0A0A] border-b border-white/10 flex items-center justify-between px-6 shrink-0 select-none">
         <div className="flex items-center gap-6">
             <div className="flex items-center gap-3">
-                <div className="p-2 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl shadow-lg shadow-orange-500/20">
-                    <Code size={20} className="text-white" />
+                <div className="p-2 bg-[#FF4A1F]/10 rounded-xl">
+                    <Code size={20} className="text-[#FF4A1F]" />
                 </div>
                 <div>
                     <h2 className="font-bold text-white text-lg">Coding Challenge</h2>
-                    <p className="text-xs text-slate-400">Solve • Test • Submit</p>
+                    <p className="text-xs text-gray-400">Time Limit: 45m</p>
                 </div>
             </div>
-            
-            <div className="h-8 w-px bg-gradient-to-b from-transparent via-slate-700 to-transparent" />
-            
-            <div className={`flex items-center gap-2 px-4 py-2 rounded-xl font-mono text-sm font-bold backdrop-blur-sm transition-all duration-300 ${timeLeft < 300 ? 'bg-red-500/20 text-red-400 border border-red-500/30 animate-pulse' : 'bg-slate-800/50 text-slate-300 border border-slate-700/50'}`}>
+            <div className={`flex items-center gap-2 px-4 py-2 rounded-xl font-mono text-sm font-bold border ${timeLeft < 300 ? 'bg-red-500/10 text-red-500 border-red-500/20 animate-pulse' : 'bg-white/5 text-gray-300 border-white/5'}`}>
                 <Clock size={16} />
                 <span>{Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</span>
             </div>
         </div>
         
         <div className="flex items-center gap-3">
-            <select value={language} onChange={(e) => setLanguage(e.target.value)} className="bg-slate-900 text-slate-300 text-sm border border-slate-700 rounded-xl px-4 py-2 outline-none">
+            <select value={language} onChange={(e) => setLanguage(e.target.value)} className="bg-[#111] text-white text-sm border border-white/10 rounded-xl px-4 py-2 outline-none hover:border-white/20 transition-colors cursor-pointer">
                 <option value="java">☕ Java</option>
                 <option value="python">🐍 Python</option>
                 <option value="cpp">⚡ C++</option>
             </select>
-            <button onClick={handleRun} disabled={isRunning} className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-slate-800 to-slate-700 text-white text-sm rounded-xl border border-slate-600 shadow-lg hover:scale-105 transition-all">
+            <button onClick={handleRun} disabled={isRunning} className="flex items-center gap-2 px-5 py-2 bg-white/5 text-white text-sm rounded-xl border border-white/10 hover:bg-white/10 transition-all font-medium disabled:opacity-50">
                {isRunning ? <Cpu className="animate-spin" size={16} /> : <Play size={16} />} 
-               <span className="font-semibold">{isRunning ? "Running..." : "Run Code"}</span>
+               <span>{isRunning ? "Running..." : "Run Code"}</span>
             </button>
-            <button onClick={handleSubmit} className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-orange-500 to-red-600 text-white font-bold text-sm rounded-xl shadow-lg transition-all hover:scale-105">
+            <button onClick={handleSubmit} className="flex items-center gap-2 px-5 py-2 bg-[#FF4A1F] text-white font-bold text-sm rounded-xl hover:bg-orange-600 transition-all shadow-lg shadow-orange-900/20">
                <span>Submit</span>
                <Send size={16} />
             </button>
         </div>
       </div>
 
-      {/* SPLIT VIEW (Flex-1 ensures it fills remaining height) */}
-      <div id="split-container" className="flex-1 flex overflow-hidden">
-        {/* LEFT: DESCRIPTION PANEL */}
-        <div className="border-r border-slate-800/50 p-6 overflow-y-auto bg-gradient-to-br from-slate-900/50 to-slate-800/50 backdrop-blur-sm" style={{ width: `${leftPanelWidth}%` }}>
-            <div className="space-y-6">
-                <div className="bg-gradient-to-r from-slate-800/80 to-slate-900/80 backdrop-blur-xl p-6 rounded-2xl border border-slate-700/50 shadow-xl">
-                    <div className="flex items-start justify-between mb-3">
-                        <h1 className="text-2xl font-bold text-white leading-tight flex-1">{activeProblem.title}</h1>
-                        <span className={`text-xs px-3 py-1.5 rounded-full border font-semibold bg-gradient-to-r ${getDifficultyColor(activeProblem.difficulty)} bg-clip-text text-transparent border-slate-600`}>{activeProblem.difficulty || "Medium"}</span>
+      {/* SPLIT VIEW */}
+      <div ref={containerRef} className="flex-1 flex overflow-hidden relative">
+        {/* LEFT PANEL */}
+        <div className="flex flex-col bg-[#0f0f0f] overflow-hidden" style={{ width: `${leftPanelWidth}%`, minWidth: '20%', maxWidth: '70%' }}>
+            <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-white/10">
+                <div className="space-y-6">
+                    <div>
+                        <div className="flex items-center justify-between mb-4">
+                            <h1 className="text-2xl font-bold text-white">{activeProblem.title}</h1>
+                            <span className={`text-xs px-3 py-1 rounded-full border font-bold bg-gradient-to-r ${getDifficultyColor(activeProblem.difficulty)} bg-clip-text text-transparent border-white/10`}>
+                                {activeProblem.difficulty || "Medium"}
+                            </span>
+                        </div>
+                        <p className="text-gray-400 text-sm leading-relaxed whitespace-pre-wrap font-sans">{activeProblem.description}</p>
                     </div>
-                    <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">{activeProblem.description}</p>
-                </div>
-                {/* ... Test Cases ... */}
-                <div className="space-y-3">
-                    <div className="flex items-center gap-2"><Sparkles size={16} className="text-orange-400"/><h3 className="text-sm font-bold text-white uppercase tracking-wider">Sample Test Case</h3></div>
-                    <div className="bg-slate-950/50 backdrop-blur-xl p-5 rounded-2xl border border-slate-700/50 font-mono text-sm shadow-xl">
-                        <div className="space-y-4">
-                            <div><div className="text-slate-500 text-xs mb-2 font-semibold uppercase tracking-wider">Input:</div><div className="text-emerald-400 bg-slate-900/50 px-4 py-2 rounded-lg border border-slate-800">{activeProblem.testCases?.[0]?.input || "N/A"}</div></div>
-                            <div><div className="text-slate-500 text-xs mb-2 font-semibold uppercase tracking-wider">Expected Output:</div><div className="text-orange-400 bg-slate-900/50 px-4 py-2 rounded-lg border border-slate-800">{activeProblem.testCases?.[0]?.expected || "N/A"}</div></div>
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-2"><Sparkles size={16} className="text-[#FF4A1F]"/><h3 className="text-sm font-bold text-white uppercase tracking-wider">Sample Case</h3></div>
+                        <div className="bg-[#1a1a1a] p-5 rounded-2xl border border-white/5 font-mono text-sm">
+                            <div className="space-y-4">
+                                <div><div className="text-gray-500 text-xs mb-2 font-bold uppercase">Input</div><div className="text-white bg-black/50 px-4 py-3 rounded-lg border border-white/5">{activeProblem.testCases?.[0]?.input || "N/A"}</div></div>
+                                <div><div className="text-gray-500 text-xs mb-2 font-bold uppercase">Expected Output</div><div className="text-[#FF4A1F] bg-black/50 px-4 py-3 rounded-lg border border-white/5">{activeProblem.testCases?.[0]?.expected || "N/A"}</div></div>
+                            </div>
                         </div>
                     </div>
                 </div>
-                {/* ... Status Badge ... */}
-                {finalStatus && (
-                    <div className={`p-5 rounded-2xl border-2 shadow-2xl backdrop-blur-xl transition-all duration-500 ${finalStatus === "Accepted" ? "bg-emerald-900/20 border-emerald-500" : "bg-red-900/20 border-red-500"}`}>
-                        <div className="flex items-center gap-3">
-                            {finalStatus === "Accepted" ? <CheckCircle className="text-emerald-400" size={28}/> : <XCircle className="text-red-400" size={28}/>}
-                            <div><span className={`font-bold text-xl ${finalStatus === "Accepted" ? "text-emerald-400" : "text-red-400"}`}>{finalStatus}</span></div>
-                        </div>
+            </div>
+            {finalStatus && (
+                <div className={`p-4 border-t ${finalStatus === "Accepted" ? "bg-emerald-900/10 border-emerald-500/20" : finalStatus === "Error" ? "bg-pink-900/10 border-pink-500/20" : "bg-red-900/10 border-red-500/20"}`}>
+                    <div className="flex items-center gap-3">
+                        {finalStatus === "Accepted" ? <CheckCircle className="text-emerald-500" size={24}/> : finalStatus === "Error" ? <AlertTriangle className="text-pink-500" size={24}/> : <XCircle className="text-red-500" size={24}/>}
+                        <span className={`font-bold ${finalStatus === "Accepted" ? "text-emerald-500" : finalStatus === "Error" ? "text-pink-500" : "text-red-500"}`}>{finalStatus === "Error" ? "Runtime / Compilation Error" : finalStatus}</span>
                     </div>
-                )}
-            </div>
-        </div>
-
-        {/* RESIZER */}
-        <div className="w-1 bg-slate-800/50 hover:bg-orange-500/50 cursor-col-resize transition-colors relative group" onMouseDown={() => setIsDraggingVertical(true)}>
-          <div className="absolute inset-y-0 -left-1 -right-1 flex items-center justify-center"><div className="w-1 h-12 bg-slate-700 group-hover:bg-orange-500 rounded-full"></div></div>
-        </div>
-
-        {/* RIGHT: EDITOR */}
-        <div id="editor-container" className="flex-1 flex flex-col bg-slate-950/90">
-            <div className="h-12 bg-slate-900/50 border-b border-slate-800/50 flex items-center px-4 gap-3">
-                <FileCode size={16} className="text-slate-400"/>
-                <span className="text-sm text-slate-400 font-mono">{LANGUAGE_VERSIONS[language].file}</span>
-            </div>
-            <textarea value={code} onChange={(e) => setCode(e.target.value)} className="flex-1 w-full bg-slate-950 text-slate-200 font-mono text-sm p-6 outline-none resize-none leading-relaxed" placeholder="// Write your solution here..." spellCheck="false" style={{ lineHeight: '1.6', tabSize: 4 }} />
-            
-            <div className="h-1 bg-slate-800/50 hover:bg-orange-500/50 cursor-row-resize transition-colors relative group" onMouseDown={() => setIsDraggingHorizontal(true)}>
-              <div className="absolute inset-x-0 -top-1 -bottom-1 flex items-center justify-center"><div className="h-1 w-12 bg-slate-700 group-hover:bg-orange-500 rounded-full"></div></div>
-            </div>
-            
-            <div className="border-t border-slate-800/50 bg-black flex flex-col shadow-2xl" style={{ height: `${consoleHeight}px` }}>
-                <div className="h-10 bg-slate-900/80 border-b border-slate-800/50 flex items-center px-4 gap-3">
-                    <Terminal size={14} className="text-slate-400"/>
-                    <span className="text-xs text-slate-400 uppercase font-semibold tracking-wider">Console Output</span>
                 </div>
-                <div className="flex-1 p-4 overflow-y-auto font-mono text-sm">
-                    {/* ... (Keep existing console logic) ... */}
-                    {isRunning ? <div className="flex items-center gap-3 text-slate-400"><Cpu className="animate-spin" size={16}/><span>Executing...</span></div> : testResults.length > 0 ? (
-                        <div className="space-y-3">{testResults.map((res, i) => <div key={i} className={`p-3 rounded-xl border ${res.passed ? 'border-emerald-700/30 text-emerald-400' : 'border-red-700/30 text-red-400'}`}>{res.passed ? 'PASS' : `FAIL: Expected ${res.expected}, Got ${res.actual}`}</div>)}</div>
-                    ) : <div className="text-slate-500 text-sm flex items-center gap-2"><Zap size={16}/><span>Ready.</span></div>}
+            )}
+        </div>
+
+        {/* DRAGGER */}
+        <div className="w-1 bg-[#1a1a1a] hover:bg-[#FF4A1F] cursor-col-resize transition-colors flex items-center justify-center z-50 hover:w-1.5 active:bg-[#FF4A1F]" onMouseDown={() => setIsDraggingSplit(true)}><GripVertical size={12} className="text-gray-600"/></div>
+
+        {/* RIGHT PANEL */}
+        <div ref={rightPanelRef} className="flex-1 flex flex-col bg-[#050505] min-w-[30%] relative">
+            <div className="h-10 bg-[#0f0f0f] border-b border-white/5 flex items-center px-4 gap-3 select-none">
+                <FileCode size={14} className="text-gray-500"/>
+                <span className="text-xs text-gray-500 font-mono">{LANGUAGE_VERSIONS[language].file}</span>
+            </div>
+            <textarea value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={handleKeyDown}  className="flex-1 w-full bg-[#050505] text-gray-300 font-mono text-sm p-6 outline-none resize-none leading-relaxed selection:bg-[#FF4A1F]/30" placeholder="// Write your solution here..." spellCheck="false" style={{ lineHeight: '1.6', tabSize: 4, pointerEvents: isDraggingSplit || isDraggingConsole ? 'none' : 'auto' }} />
+            <div className="h-1 bg-[#1a1a1a] hover:bg-[#FF4A1F] cursor-row-resize transition-colors z-50 hover:h-1.5 active:bg-[#FF4A1F]" onMouseDown={() => setIsDraggingConsole(true)}/>
+            <div className="bg-[#0f0f0f] border-t border-white/5 flex flex-col" style={{ height: `${consoleHeight}px` }}>
+                <div className="h-10 bg-[#141414] border-b border-white/5 flex items-center px-4 gap-3 select-none justify-between">
+                    <div className="flex items-center gap-2"><Terminal size={14} className="text-gray-500"/><span className="text-xs text-gray-500 uppercase font-bold tracking-wider">Console</span></div>
+                    <button onClick={() => setConsoleHeight(40)} className="text-[10px] text-gray-600 hover:text-white uppercase font-bold">Minimize</button>
+                </div>
+                <div className="flex-1 p-4 overflow-y-auto font-mono text-xs scrollbar-thin scrollbar-thumb-white/10">
+                    {isRunning ? <div className="flex items-center gap-3 text-gray-400"><Cpu className="animate-spin" size={16}/><span>Executing...</span></div> : consoleOutput ? <div className="text-pink-400 whitespace-pre-wrap bg-pink-900/10 p-3 rounded-lg border border-pink-500/10">{consoleOutput}</div> : testResults.length > 0 ? (
+                        <div className="space-y-2">{testResults.map((res, i) => <div key={i} className={`p-3 rounded-lg border flex items-center justify-between ${res.passed ? 'bg-emerald-900/10 border-emerald-500/20 text-emerald-400' : 'bg-red-900/10 border-red-500/20 text-red-400'}`}><div className="flex flex-col"><span className="font-bold">Test Case #{res.caseIndex}</span>{!res.passed && <span className="text-[10px] opacity-70 mt-1">Expected: {res.expected} | Got: {res.actual || "(Empty)"}</span>}</div><span className="font-bold">{res.passed ? 'PASS' : 'FAIL'}</span></div>)}</div>
+                    ) : <div className="text-gray-600 flex items-center gap-2 mt-2"><Zap size={14}/><span>Run your code to see output here.</span></div>}
                 </div>
             </div>
         </div>
