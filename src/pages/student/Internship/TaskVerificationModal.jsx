@@ -36,15 +36,19 @@ export default function TaskVerificationModal({ task, projectTitle, onClose, onS
       // STEP 2: AI VERIFICATION (Quality Gate)
       setStatus('verifying');
       
-      const verifyRes = await fetch('import.meta.env.VITE_MOTIA_URL/api/verify-task', { 
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            taskTitle: task.title,
-            taskDescription: task.requirements,
-            studentCode: code
-        })
-      });
+      // 1. Get the URL correctly
+const API_URL = import.meta.env.VITE_MOTIA_URL; 
+
+// 2. Use it in the fetch
+const verifyRes = await fetch(`${API_URL}/api/verify-task`, { 
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+      taskTitle: task.title,
+      taskDescription: task.requirements,
+      studentCode: code
+  })
+});
 
       const verifyData = await verifyRes.json();
 
