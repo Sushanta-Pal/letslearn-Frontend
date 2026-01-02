@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import CodingModule from './CodingModule';
-import { ArrowLeft, Loader2, Github, Check } from 'lucide-react'; // Added Icons
+import { ArrowLeft, Loader2, Github } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 export default function SolveProblemPage() {
@@ -10,7 +10,10 @@ export default function SolveProblemPage() {
   const navigate = useNavigate();
   const [problem, setProblem] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [pushingToGithub, setPushingToGithub] = useState(false); // New State
+  const [pushingToGithub, setPushingToGithub] = useState(false);
+  
+  // LOCK: Use Ref for immediate synchronous locking prevents race conditions better than state
+  const isSubmittingRef = useRef(false);
 
   // --- FETCH PROBLEM ---
   useEffect(() => {
@@ -37,20 +40,40 @@ export default function SolveProblemPage() {
     if (questionId) fetchProblem();
   }, [questionId, navigate]);
 
-  // --- GITHUB PUSH FUNCTION ---
-  const pushToGitHub = async (user, problemTitle, code, language) => {
+  // --- HELPER: CREATE REPO IF MISSING ---
+  const createRepoIfNeeded = async (token, repoName) => {
+      try {
+          const createRes = await fetch(`https://api.github.com/user/repos`, {
+              method: 'POST',
+              headers: { 
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                  name: repoName,
+                  description: 'My Data Structures & Algorithms Solutions powered by Fox Bird',
+                  private: false,
+                  auto_init: true
+              })
+          });
+          return createRes.ok;
+      } catch (e) {
+          console.error("Repo creation failed", e);
+          return false;
+      }
+  };
+
+  // --- GITHUB PUSH FUNCTION (With Auto-Create) ---
+  const pushToGitHub = async (problemTitle, code, language) => {
     try {
       setPushingToGithub(true);
       const { data: { session } } = await supabase.auth.getSession();
       const providerToken = session?.provider_token;
       const username = session?.user?.user_metadata?.user_name;
 
-      if (!providerToken || !username) {
-        console.warn("GitHub not connected. Skipping push.");
-        return false;
-      }
+      if (!providerToken || !username) return false;
 
-      const repoName = "foxbird-practice-arena"; // Same repo as QuestionList
+      const repoName = "foxbird-practice-arena";
       const safeTitle = problemTitle.replace(/[^a-zA-Z0-9]/g, '_');
       const extMap = { 'python': 'py', 'java': 'java', 'cpp': 'cpp', 'javascript': 'js' };
       const ext = extMap[language] || 'txt';
@@ -69,10 +92,10 @@ export default function SolveProblemPage() {
             const fileData = await checkRes.json();
             sha = fileData.sha;
         }
-      } catch (e) { /* Ignore if file doesn't exist */ }
+      } catch (e) { }
 
-      // 2. Upload File
-      const uploadRes = await fetch(`https://api.github.com/repos/${username}/${repoName}/contents/${filePath}`, {
+      // 2. Try Upload
+      let uploadRes = await fetch(`https://api.github.com/repos/${username}/${repoName}/contents/${filePath}`, {
           method: 'PUT',
           headers: { 
               Authorization: `Bearer ${providerToken}`,
@@ -81,14 +104,24 @@ export default function SolveProblemPage() {
           body: JSON.stringify({ message, content: contentEncoded, sha })
       });
 
-      if (!uploadRes.ok) {
-         if (uploadRes.status === 404) {
-             alert("Could not push to GitHub: Repository 'foxbird-practice-arena' not found. Please create it from the Practice Dashboard.");
-         }
-         return false;
+      // 3. AUTO-FIX: If Repo Not Found (404), Create it and Retry
+      if (uploadRes.status === 404) {
+          console.log("Repo not found. Creating...");
+          const created = await createRepoIfNeeded(providerToken, repoName);
+          if (created) {
+              // Retry Upload
+              uploadRes = await fetch(`https://api.github.com/repos/${username}/${repoName}/contents/${filePath}`, {
+                  method: 'PUT',
+                  headers: { 
+                      Authorization: `Bearer ${providerToken}`,
+                      'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({ message, content: contentEncoded, sha })
+              });
+          }
       }
-      
-      return true;
+
+      return uploadRes.ok;
 
     } catch (err) {
       console.error("GitHub Push Error:", err);
@@ -100,56 +133,77 @@ export default function SolveProblemPage() {
 
   // --- SUBMISSION HANDLER ---
   const handleComplete = async (score, submittedCode, language) => { 
+    // LOCK: Prevent double execution
+    if (isSubmittingRef.current) return; 
+    
     if(score === 100) {
-      // 1. Visual Celebration
-      confetti();
+      // Set Lock
+      isSubmittingRef.current = true;
       
-      const { data: { user } } = await supabase.auth.getUser();
-      const reward = problem.coin_reward || 10;
+      try {
+        confetti();
+        const { data: { user } } = await supabase.auth.getUser();
+        const reward = problem.coin_reward || 10;
 
-      // 2. CHECK: Has user already solved this?
-      const { data: existingSolution } = await supabase
-        .from('student_solutions')
-        .select('status')
-        .eq('user_id', user.id)
-        .eq('question_id', questionId)
-        .maybeSingle();
+        // 1. CHECK: Has user already solved this?
+        const { data: existingSolution } = await supabase
+          .from('student_solutions')
+          .select('status')
+          .eq('user_id', user.id)
+          .eq('question_id', questionId)
+          .maybeSingle();
 
-      const isAlreadySolved = existingSolution?.status === 'Solved';
+        const isAlreadySolved = existingSolution && existingSolution.status === 'Solved';
 
-      // 3. SAVE to Database
-      const { error: saveError } = await supabase.from('student_solutions').upsert({
-        user_id: user.id,
-        question_id: questionId,
-        status: 'Solved',
-        earned_coins: isAlreadySolved ? 0 : reward, 
-        code_submitted: submittedCode,
-        language: language            
-      }, { onConflict: 'user_id, question_id' });
+        // 2. SAVE to Database
+        const { error: saveError } = await supabase.from('student_solutions').upsert({
+          user_id: user.id,
+          question_id: questionId,
+          status: 'Solved',
+          earned_coins: isAlreadySolved ? 0 : reward, 
+          code_submitted: submittedCode,
+          language: language            
+        }, { onConflict: 'user_id, question_id' });
 
-      if (saveError) {
-        console.error("Error saving solution:", saveError);
-        return; 
+        if (saveError) {
+          console.error("Error saving solution:", saveError);
+          isSubmittingRef.current = false; // Release lock on error
+          return; 
+        }
+
+        // 3. PUSH TO GITHUB (Now robust with auto-create)
+        const githubSuccess = await pushToGitHub(problem.title, submittedCode, language);
+
+        // 4. REWARD LOGIC (Prevents Double Coins)
+        let msg = "";
+        
+        if (!isAlreadySolved) {
+          // --- ⚠️ CRITICAL: DOUBLE COIN FIX ---
+          // If you added a Database Trigger to 'student_solutions' earlier, 
+          // COMMENT OUT the following 'supabase.rpc' block.
+          // Otherwise, keep it.
+          
+          const { error: rpcError } = await supabase.rpc('increment_profile_coins', { p_amount: reward });
+          
+          if (rpcError) {
+             console.error("Wallet error (might be duplicate):", rpcError);
+          } else {
+             msg = `Problem Solved! +${reward} Coins Added.`;
+          }
+        } else {
+          msg = "Problem Solved! (You have already earned coins for this problem).";
+        }
+
+        if (githubSuccess) msg += " Code pushed to GitHub! 🚀";
+        
+        alert(msg);
+        navigate('/student/questions');
+
+      } catch (error) {
+        console.error("Submission Error:", error);
+        alert("Something went wrong during submission.");
+        isSubmittingRef.current = false; // Release lock
       }
-
-      // 4. PUSH TO GITHUB (New Step)
-      const githubSuccess = await pushToGitHub(user, problem.title, submittedCode, language);
-
-      // 5. REWARD & FEEDBACK
-      let msg = "";
-      if (!isAlreadySolved) {
-        const { error: rpcError } = await supabase.rpc('increment_profile_coins', { p_amount: reward });
-        if (rpcError) console.error("Wallet error:", rpcError);
-        msg = `Problem Solved! +${reward} Coins Added.`;
-      } else {
-        msg = "Problem Solved! (Already earned coins).";
-      }
-
-      if (githubSuccess) msg += " Code pushed to GitHub! 🚀";
-      
-      alert(msg);
-      navigate('/student/questions');
-
     } else {
         alert("Keep trying! You need to pass all test cases.");
     }

@@ -102,6 +102,7 @@ export default function DashboardLayout() {
     { name: "Assignments", path: "/dashboard/teacher/assignments" },
     { name: "Post Job", path: "/dashboard/teacher/create-internship" },
     { name: "Add Question", path: "/dashboard/teacher/add-question" },
+    { name: "Review Submissions", path: "/dashboard/teacher/reviews" },
   ];
 
   const isTeacher = ['Teacher', 'teacher', 'Creator', 'creator'].includes(role);

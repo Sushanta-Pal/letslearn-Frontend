@@ -27,6 +27,7 @@ import SolveProblemPage from "./pages/student/SolveProblemPage";
 import CreateInternship from "./pages/Teacher/CreateInternship";
 import AddQuestionPage from "./pages/Teacher/AddQuestionPage";
 import ManageCourses from "./pages/Teacher/ManageCourses";
+import ReviewDashboard from './pages/teacher/ReviewDashboard';
 
 const pageMotionProps = {
   initial: { opacity: 0, y: 10 },
@@ -67,6 +68,7 @@ function AnimatedRoutes() {
            <Route path="teacher/add-question" element={<AddQuestionPage />} />
            <Route path="teacher/manage-courses" element={<ManageCourses />} />
            <Route path="teacher/assignments" element={<motion.div {...pageMotionProps}><AssignmentManager /></motion.div>} />
+            <Route path="teacher/reviews" element={<ReviewDashboard />} />
         </Route>
 
         {/* FULL SCREEN MODES (No Top Nav) */}
