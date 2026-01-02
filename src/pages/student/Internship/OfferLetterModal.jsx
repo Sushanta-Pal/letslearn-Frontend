@@ -1,181 +1,472 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle, ShieldCheck, X, Loader2, Crown } from 'lucide-react';
-import { supabase } from '../../../supabaseClient'; // Ensure path is correct
-// import { handlePayment } from '../../../utils/paymentGateway'; // Uncomment if using real Razorpay
+import { supabase } from '../../../supabaseClient';
+import { useParams, useNavigate } from 'react-router-dom';
+import { 
+  Loader2, ArrowLeft, Github, Plus, Clock, CheckCircle, 
+  AlertTriangle, Lock, ChevronDown, ChevronUp, Globe, X, Trophy, RefreshCw, Send 
+} from 'lucide-react';
+import TaskVerificationModal from './TaskVerificationModal';
 
-export default function OfferLetterModal({ project, user, onAccept, onClose }) {
-  const [processing, setProcessing] = useState(false);
-  const [isProMember, setIsProMember] = useState(false);
-  const [checkingStatus, setCheckingStatus] = useState(true);
+const InternshipWorkspace = ({ user }) => {
+  const { projectId } = useParams();
+  const navigate = useNavigate();
+  
+  // Data State
+  const [loading, setLoading] = useState(true);
+  const [project, setProject] = useState(null);
+  const [submission, setSubmission] = useState(null);
+  const [tasks, setTasks] = useState({ todo: [], in_progress: [], done: [] });
+  
+  // GitHub State
+  const [isGithubConnected, setIsGithubConnected] = useState(false);
+  const [repoStatus, setRepoStatus] = useState('idle'); 
 
-  // 1. CHECK IF USER IS PRO (Has valid transaction)
+  // UI State
+  const [verifyingTask, setVerifyingTask] = useState(null);
+  const [viewingTaskRequirements, setViewingTaskRequirements] = useState(null); 
+  const [expandedTasks, setExpandedTasks] = useState({}); 
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
+  
+  // State for form
+  const [submitForm, setSubmitForm] = useState({ repo: '', live: '' });
+
   useEffect(() => {
-    const checkProStatus = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('transactions')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('status', 'success')
-          // You can check for specific plan names here if needed:
-          // .eq('plan_name', 'Pro Plan') 
-          .limit(1);
+    fetchWorkspaceData();
+    handleGitHubFlow();
+  }, [projectId]);
 
-        if (data && data.length > 0) {
-          setIsProMember(true);
+  // --- 1. GITHUB LOGIC ---
+  const handleGitHubFlow = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.provider_token) {
+        setIsGithubConnected(true);
+        const repoCreated = localStorage.getItem(`foxbird_repo_${user.id}`);
+        if (!repoCreated) {
+            await createInternshipRepo(session.provider_token, session.user.user_metadata.user_name);
+        } else {
+            setRepoStatus('ready');
         }
-      } catch (err) {
-        console.error("Error checking pro status:", err);
-      } finally {
-        setCheckingStatus(false);
-      }
-    };
-
-    checkProStatus();
-  }, [user.id]);
-
-  // 2. HANDLE ACCEPTANCE
-  const handleAcceptOffer = async () => {
-    setProcessing(true);
-
-    if (isProMember) {
-      // --- SCENARIO A: PRO USER (SKIP PAYMENT) ---
-      // Simulate brief loading for UX
-      setTimeout(() => {
-        setProcessing(false);
-        onAccept(); // Directly accept
-      }, 1000);
-
-    } else {
-      // --- SCENARIO B: NORMAL USER (PAYMENT REQUIRED) ---
-      
-      // NOTE: In production, uncomment the real Razorpay call below
-      /*
-      await handlePayment({
-          amount: project.price || 149,
-          name: "Internship Fee",
-          description: project.title,
-          userEmail: user.email,
-          onSuccess: async (response) => {
-             // Save transaction first, then accept
-             await supabase.from('transactions').insert({
-                 user_id: user.id,
-                 payment_id: response.razorpay_payment_id,
-                 amount: project.price || 149,
-                 status: 'success',
-                 plan_name: 'Internship Fee'
-             });
-             onAccept();
-          }
-      });
-      setProcessing(false);
-      */
-
-      // For now (Simulation as per your request):
-      setTimeout(() => {
-        setProcessing(false);
-        onAccept(); 
-      }, 2000);
     }
   };
 
+  const connectGitHub = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'github',
+      options: { scopes: 'repo', redirectTo: window.location.href }
+    });
+    if (error) alert("Connection Failed: " + error.message);
+  };
+
+  const handleManualRepair = async () => {
+    if(!confirm("This will recreate the 'foxbird-internship-portfolio' repo on GitHub. Continue?")) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.provider_token) {
+        localStorage.removeItem(`foxbird_repo_${user.id}`);
+        await createInternshipRepo(session.provider_token, session.user.user_metadata.user_name);
+    } else {
+        alert("Session expired. Please reconnect GitHub.");
+        connectGitHub();
+    }
+  };
+
+  const createInternshipRepo = async (token, username) => {
+    setRepoStatus('creating');
+    const repoName = "foxbird-internship-portfolio"; 
+    try {
+        const check = await fetch(`https://api.github.com/repos/${username}/${repoName}`, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        if (check.status === 404) {
+            const create = await fetch(`https://api.github.com/user/repos`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: repoName,
+                    description: "My Internship Portfolio powered by Fox Bird",
+                    private: false, 
+                    auto_init: true 
+                })
+            });
+            if (!create.ok) throw new Error("Failed to create repo");
+            alert(`Success! Repository '${repoName}' created.`);
+        } else {
+             console.log("Repo found.");
+             alert(`Repository '${repoName}' connected!`);
+        }
+        localStorage.setItem(`foxbird_repo_${user.id}`, 'true');
+        setRepoStatus('ready');
+    } catch (err) {
+        console.error("Repo Setup Error:", err);
+        alert("Error: " + err.message);
+        setRepoStatus('idle');
+    }
+  };
+
+  // --- 2. WORKSPACE DATA LOGIC ---
+  const saveBoardState = async (newState, subId) => {
+    const { error } = await supabase.from('internship_submissions').update({ board_state: newState }).eq('id', subId);
+    if (error) console.error("Auto-save failed:", error);
+  };
+
+  const fetchWorkspaceData = async () => {
+    try {
+      const { data: proj, error: projError } = await supabase.from('internship_projects').select('*').eq('id', projectId).single();
+      if (projError) throw projError;
+
+      const { data: sub, error: subError } = await supabase.from('internship_submissions').select('*').eq('user_id', user.id).eq('project_id', projectId).single();
+
+      if (subError) {
+        alert("Not enrolled in this internship.");
+        navigate('/student/internships');
+        return;
+      }
+
+      setProject(proj);
+      setSubmission(sub);
+
+      let boardIsStale = false;
+      if (sub.board_state && (sub.board_state.todo.length || sub.board_state.in_progress.length || sub.board_state.done.length)) {
+          const allTasks = [...sub.board_state.todo, ...sub.board_state.in_progress, ...sub.board_state.done];
+          if (allTasks.length > 0) {
+              const sampleTask = allTasks[0];
+              if (!sampleTask.test_cases && !sampleTask.testCases) {
+                  boardIsStale = true;
+              }
+          }
+      } else {
+          boardIsStale = true; 
+      }
+
+      if (boardIsStale) {
+        const initialTasks = proj.tasks?.map((t, i) => {
+            const tId = t.id || `task-${i}`;
+            return { ...t, id: tId }; 
+        }) || [];
+        const newState = { todo: initialTasks, in_progress: [], done: [] };
+        setTasks(newState);
+        saveBoardState(newState, sub.id);
+      } else {
+        setTasks(sub.board_state);
+      }
+    } catch (error) {
+      console.error("Workspace Load Error:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const performMove = async (task, sourceCol, targetCol) => {
+    const newTasks = {
+      ...tasks,
+      [sourceCol]: tasks[sourceCol].filter(t => t.id !== task.id),
+      [targetCol]: [...tasks[targetCol], task]
+    };
+    setTasks(newTasks);
+    await supabase.from('internship_submissions').update({ board_state: newTasks }).eq('id', submission.id);
+  };
+
+  const handleDrop = async (e, targetCol) => {
+    const taskId = e.dataTransfer.getData("taskId");
+    const sourceCol = e.dataTransfer.getData("sourceCol");
+    if (!taskId || sourceCol === targetCol) return;
+    if (sourceCol === 'done') return;
+
+    const taskToMove = tasks[sourceCol].find(t => t.id === taskId);
+    if (!taskToMove) return;
+
+    if (targetCol === 'done') {
+      setVerifyingTask({ task: taskToMove, sourceCol }); 
+      return; 
+    }
+    performMove(taskToMove, sourceCol, targetCol);
+  };
+
+  const handleVerificationSuccess = async (xpReward) => {
+    if (!verifyingTask) return;
+    const { task, sourceCol } = verifyingTask;
+    await performMove(task, sourceCol, 'done');
+    await supabase.rpc('add_xp_and_check_rank', { p_user_id: user.id, p_xp_amount: xpReward || 100 });
+    
+    alert(`Task Verified & Pushed to GitHub! +${xpReward || 100} XP`);
+    setVerifyingTask(null);
+  };
+
+  // --- SAFE MODAL OPENING & AUTO-FILL ---
+  const handleOpenSubmitModal = async () => {
+    if (tasks.todo.length > 0 || tasks.in_progress.length > 0) {
+      return alert("You must complete ALL tasks (move to 'Done') before submitting.");
+    }
+    
+    // 1. Get Session for Username
+    const { data: { session } } = await supabase.auth.getSession();
+    // 2. Fallback to User prop if session is tricky
+    const username = session?.user?.user_metadata?.user_name || user?.user_metadata?.user_name;
+    
+    if (username) {
+        setSubmitForm(prev => ({
+            ...prev,
+            repo: `https://github.com/${username}/foxbird-internship-portfolio`
+        }));
+    } else {
+        console.warn("Could not auto-fill GitHub username. User must enter manually.");
+    }
+    
+    setShowSubmitModal(true);
+  };
+
+  // --- SUBMIT LOGIC (Robust) ---
+  const submitProject = async () => {
+    // 1. Sanitize Inputs
+    const repo = submitForm.repo.trim(); // <--- CRITICAL FIX: Trim spaces
+    const live = submitForm.live.trim();
+
+    // 2. Validation
+    if (!repo) return alert("Please enter your GitHub Repository URL.");
+    if (!repo.toLowerCase().includes("github.com")) return alert("Invalid URL. It must contain 'github.com'.");
+
+    if (!confirm("Submit project for mentor review? You won't be able to edit it while it's under review.")) return;
+
+    setLoading(true);
+    try {
+        const { error: updateError } = await supabase.from('internship_submissions').update({ 
+            repo_link: repo,
+            live_link: live || null,
+            status: 'pending_review',
+            submitted_at: new Date()
+        }).eq('id', submission.id);
+
+        if (updateError) throw updateError;
+
+        alert("Project Submitted for Review! \n\nYour mentor will verify your code. Once approved, your certificate will be generated.");
+        navigate('/student/internships'); 
+
+    } catch(err) {
+        console.error("Submission failed:", err);
+        alert("Submission failed. Please try again.");
+    } finally {
+        setLoading(false);
+    }
+  };
+
+  const toggleTaskExpand = (e, taskId) => {
+    e.stopPropagation();
+    setExpandedTasks(prev => ({ ...prev, [taskId]: !prev[taskId] }));
+  };
+
+  if (loading) return <div className="h-screen flex items-center justify-center bg-black text-white"><Loader2 className="animate-spin text-indigo-500" size={40}/></div>;
+
+  const totalTasks = tasks.todo.length + tasks.in_progress.length + tasks.done.length;
+  const progressPercent = totalTasks === 0 ? 0 : Math.round((tasks.done.length / totalTasks) * 100);
+
   return (
-    <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-in fade-in">
-      <div className="bg-white text-black max-w-2xl w-full rounded-xl relative shadow-2xl overflow-hidden flex flex-col md:flex-row">
-        
-        {/* Left: Branding Side */}
-        <div className="bg-[#0A0A0A] text-white p-8 md:w-1/3 flex flex-col justify-between relative overflow-hidden">
-           <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-indigo-900/20 to-transparent pointer-events-none"/>
-           <div>
-              <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center text-black font-bold text-2xl mb-6 shadow-lg">
-                 {project.company_name?.[0]}
-              </div>
-              <h3 className="text-gray-400 text-xs uppercase tracking-widest mb-1">Official Offer</h3>
-              <h1 className="text-2xl font-bold leading-tight">{project.company_name}</h1>
-           </div>
-           <div className="space-y-4 mt-8">
-              <div className="flex items-center gap-3 text-sm text-gray-300">
-                 <ShieldCheck className="text-emerald-400" size={18}/> Verified Role
-              </div>
-              <div className="flex items-center gap-3 text-sm text-gray-300">
-                 <CheckCircle className="text-emerald-400" size={18}/> Certificate Included
-              </div>
-              {isProMember && (
-                  <div className="flex items-center gap-3 text-sm text-yellow-400 font-bold bg-yellow-400/10 p-2 rounded-lg border border-yellow-400/20">
-                    <Crown size={18}/> Pro Member Benefit
-                  </div>
-              )}
-           </div>
+    <div className="min-h-screen bg-[#0A0A0A] text-white flex flex-col font-sans">
+      
+      {/* HEADER */}
+      <header className="h-16 border-b border-gray-800 flex items-center justify-between px-6 bg-[#111]">
+        <div className="flex items-center gap-4">
+          <button onClick={() => navigate('/student/internships')} className="p-2 hover:bg-gray-800 rounded-full transition-colors"><ArrowLeft size={20} /></button>
+          <div>
+            <h1 className="font-bold text-lg">{project?.company_name}</h1>
+            <p className="text-xs text-gray-400">Engineering Workspace</p>
+          </div>
         </div>
 
-        {/* Right: The Letter */}
-        <div className="p-8 md:w-2/3 font-serif relative">
-           <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-black hover:bg-gray-100 rounded-full p-1 transition-colors"><X size={20}/></button>
-           
-           <div className="mb-6 border-b border-gray-100 pb-4">
-              <h2 className="text-xl font-bold text-gray-900 uppercase tracking-wide">Offer of Internship</h2>
-              <p className="text-sm text-gray-500 mt-1">Date: {new Date().toLocaleDateString()}</p>
-           </div>
-
-           <div className="space-y-4 text-gray-700 text-sm leading-relaxed">
-              <p>Dear <strong>{user.user_metadata?.full_name || user.email?.split('@')[0]}</strong>,</p>
-              <p>
-                We are pleased to offer you the position of <strong>{project.role_title}</strong> at {project.company_name}. 
-              </p>
-              
-              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 my-4 font-sans">
-                 <div className="flex justify-between mb-2">
-                    <span className="text-gray-500 text-xs uppercase">Role</span>
-                    <span className="font-bold text-gray-900">{project.role_title}</span>
-                 </div>
-                 <div className="flex justify-between items-center border-t border-gray-200 pt-2 mt-2">
-                    <span className="text-gray-500 text-xs uppercase">Fee</span>
-                    <div className="text-right">
-                       {isProMember ? (
-                           <>
-                             <span className="text-gray-400 line-through text-xs mr-2">₹{project.price || 149}</span>
-                             <span className="text-emerald-600 font-bold text-lg">FREE</span>
-                             <p className="text-[10px] text-emerald-600 font-medium">Included with Pro Plan</p>
-                           </>
-                       ) : (
-                           <>
-                             <span className="text-gray-400 line-through text-xs mr-2">₹999</span>
-                             <span className="text-emerald-700 font-bold text-lg">₹{project.price || 149}</span>
-                           </>
-                       )}
-                    </div>
-                 </div>
-              </div>
-           </div>
-
-           <div className="mt-8">
-              {checkingStatus ? (
-                 <button disabled className="w-full bg-gray-100 text-gray-400 font-bold py-4 rounded-xl flex items-center justify-center gap-2">
-                    <Loader2 className="animate-spin" size={20} /> Checking Eligibility...
-                 </button>
-              ) : (
-                <button 
-                    onClick={handleAcceptOffer} 
-                    disabled={processing}
-                    className={`w-full font-sans font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg hover:shadow-xl disabled:opacity-70 disabled:cursor-not-allowed ${
-                        isProMember 
-                        ? "bg-emerald-600 hover:bg-emerald-500 text-white" 
-                        : "bg-black text-white hover:bg-gray-800"
-                    }`}
-                >
-                    {processing ? (
-                        <Loader2 className="animate-spin" />
-                    ) : isProMember ? (
-                        <>Claim Offer (Free) <CheckCircle size={18}/></>
-                    ) : (
-                        `Accept Offer & Pay ₹${project.price || 149}`
-                    )}
+        <div className="flex items-center gap-3">
+            {isGithubConnected ? (
+                <div className="flex items-center gap-2">
+                    <span className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-500/10 text-green-500 text-xs font-bold border border-green-500/20 cursor-default">
+                        <Github size={16} /> Connected
+                    </span>
+                    <button onClick={handleManualRepair} className="p-2 hover:bg-gray-800 rounded-lg text-gray-400 hover:text-white transition-colors"><RefreshCw size={14} /></button>
+                </div>
+            ) : (
+                <button onClick={connectGitHub} className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold border bg-[#24292e] text-white border-gray-700 hover:bg-[#2f363d] transition-all">
+                    {repoStatus === 'creating' ? <Loader2 className="animate-spin" size={16}/> : <Github size={16} />}
+                    {repoStatus === 'creating' ? "Setting up Repo..." : "Connect GitHub"}
                 </button>
-              )}
-           </div>
-        </div>
+            )}
 
+            {/* STATUS AWARE BUTTONS */}
+            {submission?.status === 'pending_review' ? (
+                <div className="flex items-center gap-2 px-4 py-2 bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 rounded-lg text-sm font-bold animate-pulse">
+                    <Clock size={16}/> Under Review
+                </div>
+            ) : submission?.status === 'completed' ? (
+                <div className="flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/30 text-green-500 rounded-lg text-sm font-bold">
+                    <Trophy size={16}/> Certified
+                </div>
+            ) : (
+                <div className="flex gap-2 items-center">
+                    {submission?.admin_feedback && (
+                        <div className="group relative">
+                            <div className="flex items-center gap-2 px-3 py-2 bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg text-xs cursor-help">
+                                <AlertTriangle size={14}/> Action Required
+                            </div>
+                            <div className="absolute top-10 right-0 w-64 p-4 bg-[#111] border border-red-500/50 rounded-xl shadow-xl z-50 hidden group-hover:block">
+                                <p className="text-xs font-bold text-red-400 mb-1">Mentor Feedback:</p>
+                                <p className="text-xs text-gray-300">{submission.admin_feedback}</p>
+                            </div>
+                        </div>
+                    )}
+                    <button onClick={handleOpenSubmitModal} className="flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-bold shadow-lg shadow-indigo-500/20">
+                        {submission?.admin_feedback ? "Resubmit Project" : "Submit Project"}
+                    </button>
+                </div>
+            )}
+        </div>
+      </header>
+
+      {/* MAIN CONTENT */}
+      <div className="flex-1 p-8 overflow-y-auto bg-[#050505]">
+        <div className="max-w-7xl mx-auto">
+            <MilestoneJourney progress={progressPercent} />
+            <div className="flex gap-6 h-[600px] overflow-x-auto pb-4">
+                {['todo', 'in_progress', 'done'].map(col => (
+                    <div key={col} onDragOver={(e) => e.preventDefault()} onDrop={(e) => handleDrop(e, col)} className={`flex-1 min-w-[300px] rounded-2xl border flex flex-col transition-colors ${col === 'done' ? 'bg-[#111] border-green-900/30' : 'bg-[#111] border-gray-800'}`}>
+                        <div className="p-4 border-b border-gray-800 flex justify-between items-center bg-[#161616] rounded-t-2xl">
+                            <h3 className="font-bold capitalize text-gray-300 text-sm flex items-center gap-2">
+                                {col === 'todo' && <div className="w-2 h-2 rounded-full bg-gray-500"/>}
+                                {col === 'in_progress' && <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"/>}
+                                {col === 'done' && <div className="w-2 h-2 rounded-full bg-green-500"/>}
+                                {col.replace('_', ' ')}
+                            </h3>
+                            <span className="text-xs bg-gray-800 px-2 py-0.5 rounded-full text-gray-400">{tasks[col].length}</span>
+                        </div>
+                        <div className="p-4 space-y-3 overflow-y-auto flex-1 custom-scrollbar">
+                            {tasks[col].map((task) => (
+                                <div key={task.id} draggable={col !== 'done' && submission.status !== 'pending_review'} onDragStart={(e) => {
+                                    if (col === 'done' || submission.status === 'pending_review') { e.preventDefault(); return; }
+                                    e.dataTransfer.setData("taskId", task.id); 
+                                    e.dataTransfer.setData("sourceCol", col);
+                                }} onClick={() => col === 'in_progress' ? setViewingTaskRequirements(task) : null} className={`bg-[#1A1A1A] p-4 rounded-xl border border-gray-700 relative group ${col !== 'done' && submission.status !== 'pending_review' ? 'cursor-grab hover:border-indigo-500' : 'cursor-default opacity-80'}`}>
+                                    <div className="flex justify-between items-start"><p className="text-sm font-medium mb-1 text-gray-200">{task.title}</p></div>
+                                    {/* Task Card Content */}
+                                    {task.requirements && <div className="text-[10px] text-gray-500 mt-2 bg-black/30 p-2 rounded border border-white/5"><span className="line-clamp-2">{task.requirements}</span></div>}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
       </div>
+
+      {/* --- MODALS --- */}
+      {viewingTaskRequirements && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+             <div className="bg-[#111] border border-gray-800 rounded-xl max-w-md w-full p-6 shadow-2xl animate-in zoom-in-95">
+                 <div className="flex justify-between items-start mb-4">
+                     <h3 className="font-bold text-lg text-white">{viewingTaskRequirements.title}</h3>
+                     <button onClick={() => setViewingTaskRequirements(null)}><X className="text-gray-500 hover:text-white" size={20}/></button>
+                 </div>
+                 <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-800 mb-6">
+                     <p className="text-xs text-indigo-400 font-bold uppercase mb-2 flex items-center gap-2"><Lock size={12}/> Task Requirements</p>
+                     <p className="text-sm text-gray-300 font-mono leading-relaxed">{viewingTaskRequirements.requirements}</p>
+                 </div>
+                 <button onClick={() => setViewingTaskRequirements(null)} className="w-full bg-white text-black font-bold py-3 rounded-lg hover:bg-gray-200">Close</button>
+             </div>
+        </div>
+      )}
+
+      {verifyingTask && (
+        <TaskVerificationModal 
+           task={verifyingTask.task}
+           projectTitle={project?.title || "Internship_Project"} 
+           onClose={() => setVerifyingTask(null)}
+           onSuccess={handleVerificationSuccess}
+        />
+      )}
+
+      {/* UPDATED SUBMIT MODAL WITH INPUT VALIDATION */}
+      {showSubmitModal && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+            <div className="bg-[#111] border border-gray-800 rounded-2xl max-w-lg w-full p-8 shadow-2xl relative animate-in slide-in-from-bottom-4">
+                <button onClick={() => setShowSubmitModal(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white"><X size={20}/></button>
+                <h2 className="text-2xl font-bold text-white mb-2">Submit for Review</h2>
+                <p className="text-gray-400 text-sm mb-6">Your mentor will review your code. This usually takes 24-48 hours.</p>
+                <div className="space-y-4 mb-6">
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">GitHub Repository</label>
+                        <input 
+                            value={submitForm.repo} 
+                            onChange={(e) => setSubmitForm({...submitForm, repo: e.target.value})} 
+                            className={`w-full bg-[#1A1A1A] border rounded-xl px-4 py-3 text-white focus:outline-none ${!submitForm.repo || !submitForm.repo.includes('github.com') ? 'border-red-500/50 focus:border-red-500' : 'border-gray-700 focus:border-indigo-500'}`}
+                            placeholder="https://github.com/username/repo"
+                        />
+                        {(!submitForm.repo || !submitForm.repo.includes('github.com')) && (
+                            <p className="text-[10px] text-red-500 mt-1">Please enter a valid GitHub URL.</p>
+                        )}
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Live Demo (Optional)</label>
+                        <input value={submitForm.live} onChange={(e) => setSubmitForm({...submitForm, live: e.target.value})} className="w-full bg-[#1A1A1A] border border-gray-700 rounded-xl px-4 py-3 text-white focus:border-indigo-500 outline-none" placeholder="https://"/>
+                    </div>
+                </div>
+                <div className="flex gap-3">
+                    <button onClick={() => setShowSubmitModal(false)} className="flex-1 py-3 bg-gray-900 text-gray-300 rounded-xl font-bold hover:bg-gray-800">Cancel</button>
+                    
+                    {/* Disable button if invalid */}
+                    <button 
+                        onClick={submitProject} 
+                        disabled={!submitForm.repo || !submitForm.repo.includes('github.com')}
+                        className={`flex-1 py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20 ${(!submitForm.repo || !submitForm.repo.includes('github.com')) ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : 'bg-emerald-600 text-white hover:bg-emerald-500'}`}
+                    >
+                        Send to Mentor <Send size={16}/>
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
+
     </div>
   );
-}
+};
+
+const MilestoneJourney = ({ progress }) => {
+    return (
+      <div className="bg-[#111] p-6 rounded-2xl border border-gray-800 mb-8 relative overflow-hidden">
+         <div className="flex justify-between items-center mb-8 relative z-10">
+            <div>
+               <h3 className="text-xl font-bold text-white flex items-center gap-2">Internship Trajectory <Trophy size={16} className="text-yellow-500"/></h3>
+               <p className="text-sm text-gray-500">Milestone based progress tracking</p>
+            </div>
+            <div className="text-right">
+               <span className="text-3xl font-black text-indigo-500">{progress}%</span>
+               <p className="text-xs text-gray-400 uppercase tracking-widest">Completion</p>
+            </div>
+         </div>
+  
+         <div className="relative h-32 w-full">
+            <div className="absolute inset-0 grid grid-cols-4 gap-4 opacity-10">
+               <div className="border-r border-white/20"></div>
+               <div className="border-r border-white/20"></div>
+               <div className="border-r border-white/20"></div>
+            </div>
+  
+            <MilestonePoint percent={10} label="Onboard" current={progress} left="10%" bottom="10%" />
+            <MilestonePoint percent={50} label="Mid-Term" current={progress} left="50%" bottom="40%" />
+            <MilestonePoint percent={100} label="Launch" current={progress} left="90%" bottom="80%" />
+  
+            <svg className="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none">
+               <path 
+                 d="M 50 120 C 200 120, 500 80, 1000 20" 
+                 fill="none" 
+                 stroke={progress > 0 ? "#6366f1" : "#334155"} 
+                 strokeWidth="3" 
+                 strokeLinecap="round"
+                 strokeDasharray="6,6"
+               />
+            </svg>
+         </div>
+      </div>
+    );
+};
+
+const MilestonePoint = ({ percent, label, current, left, bottom }) => (
+    <div className="absolute flex flex-col items-center transform -translate-x-1/2" style={{ left, bottom }}>
+       <div className={`w-4 h-4 rounded-full border-2 border-[#111] z-20 transition-all duration-500 ${current >= percent ? 'bg-indigo-500 scale-125 shadow-lg shadow-indigo-500/50' : 'bg-gray-700'}`}></div>
+       <span className={`text-[10px] mt-2 font-bold uppercase tracking-wider ${current >= percent ? 'text-indigo-400' : 'text-gray-600'}`}>{label}</span>
+    </div>
+);
+
+export default InternshipWorkspace;

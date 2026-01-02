@@ -27,7 +27,7 @@ import SolveProblemPage from "./pages/student/SolveProblemPage";
 import CreateInternship from "./pages/Teacher/CreateInternship";
 import AddQuestionPage from "./pages/Teacher/AddQuestionPage";
 import ManageCourses from "./pages/Teacher/ManageCourses";
-import ReviewDashboard from './pages/teacher/ReviewDashboard';
+import ReviewDashboard from './pages/Teacher/ReviewDashboard';
 
 const pageMotionProps = {
   initial: { opacity: 0, y: 10 },
