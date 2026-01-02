@@ -60,15 +60,15 @@ const InternshipWorkspace = ({ user }) => {
     if (error) alert("Connection Failed: " + error.message);
   };
 
-  // --- NEW FUNCTION: FORCE RE-CREATE REPO ---
+  // --- MANUAL REPAIR FUNCTION ---
   const handleManualRepair = async () => {
-    if(!confirm("This will recreate the 'foxbird-internship' repository on your GitHub if it is missing. Continue?")) return;
+    if(!confirm("This will recreate the 'foxbird-internship-portfolio' repo on GitHub. Continue?")) return;
 
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.provider_token) {
-        // 1. Clear local memory
+        // 1. Clear local memory so it tries again
         localStorage.removeItem(`foxbird_repo_${user.id}`);
-        // 2. Try creating again
+        // 2. Run creation logic
         await createInternshipRepo(session.provider_token, session.user.user_metadata.user_name);
     } else {
         alert("Session expired. Please reconnect GitHub.");
@@ -78,7 +78,9 @@ const InternshipWorkspace = ({ user }) => {
 
   const createInternshipRepo = async (token, username) => {
     setRepoStatus('creating');
-    const repoName = "foxbird-internship";
+    
+    // --- FIX: UPDATED REPO NAME TO MATCH VERIFICATION MODAL ---
+    const repoName = "foxbird-internship-portfolio"; 
 
     try {
         // Step A: Check if repo exists
@@ -103,10 +105,10 @@ const InternshipWorkspace = ({ user }) => {
             });
 
             if (!create.ok) throw new Error("Failed to create repo");
-            alert("Repository 'foxbird-internship' has been restored!");
+            alert(`Success! Repository '${repoName}' created.`);
         } else {
              console.log("Repo found. Reconnecting...");
-             alert("Repository found and reconnected!");
+             alert(`Repository '${repoName}' found and reconnected!`);
         }
 
         // Set flag back to true
@@ -120,8 +122,7 @@ const InternshipWorkspace = ({ user }) => {
     }
   };
 
-  // ... (Keep fetchWorkspaceData, performMove, handleDrop, handleVerificationSuccess, handleOpenSubmitModal, submitProject, toggleTaskExpand exactly as they were) ...
-  // [Paste those functions here unchanged]
+  // --- 2. WORKSPACE DATA LOGIC ---
   
   const saveBoardState = async (newState, subId) => {
     const { error } = await supabase.from('internship_submissions').update({ board_state: newState }).eq('id', subId);
@@ -273,23 +274,21 @@ const InternshipWorkspace = ({ user }) => {
 
         <div className="flex items-center gap-3">
             
-            {/* UPDATED GITHUB BUTTON */}
+            {/* UPDATED GITHUB BUTTON WITH REPAIR */}
             {isGithubConnected ? (
-                // If Connected, show REPAIR option
                 <div className="flex items-center gap-2">
                     <span className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-500/10 text-green-500 text-xs font-bold border border-green-500/20 cursor-default">
                         <Github size={16} /> Connected
                     </span>
                     <button 
                         onClick={handleManualRepair}
-                        className="p-2 hover:bg-gray-800 rounded-lg text-gray-400 hover:text-white transition-colors"
+                        className="p-2 hover:bg-gray-800 rounded-lg text-gray-400 hover:text-white transition-colors border border-transparent hover:border-gray-700"
                         title="Repository missing? Click to Repair"
                     >
                         <RefreshCw size={14} />
                     </button>
                 </div>
             ) : (
-                // If Disconnected
                 <button 
                     onClick={connectGitHub}
                     className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold border bg-[#24292e] text-white border-gray-700 hover:bg-[#2f363d] transition-all"
