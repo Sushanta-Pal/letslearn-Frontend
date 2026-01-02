@@ -3,7 +3,7 @@ import { supabase } from '../../../supabaseClient';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Loader2, ArrowLeft, Github, Plus, Clock, CheckCircle, 
-  AlertTriangle, Lock, ChevronDown, ChevronUp, Globe, X, Trophy 
+  AlertTriangle, Lock, ChevronDown, ChevronUp, Globe, X, Trophy, RefreshCw 
 } from 'lucide-react';
 import TaskVerificationModal from './TaskVerificationModal';
 
@@ -19,7 +19,7 @@ const InternshipWorkspace = ({ user }) => {
   
   // GitHub State
   const [isGithubConnected, setIsGithubConnected] = useState(false);
-  const [repoStatus, setRepoStatus] = useState('idle'); // idle, creating, ready
+  const [repoStatus, setRepoStatus] = useState('idle'); 
 
   // UI State
   const [verifyingTask, setVerifyingTask] = useState(null);
@@ -33,17 +33,15 @@ const InternshipWorkspace = ({ user }) => {
     handleGitHubFlow();
   }, [projectId]);
 
-  // --- 1. GITHUB AUTOMATION LOGIC ---
+  // --- 1. GITHUB LOGIC ---
 
   const handleGitHubFlow = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     
-    // Check if user is connected via OAuth
     if (session?.provider_token) {
         setIsGithubConnected(true);
         
-        // AUTO-CREATE REPO LOGIC
-        // We check if we already created it locally to avoid API spam
+        // CHECK LOCAL STORAGE
         const repoCreated = localStorage.getItem(`foxbird_repo_${user.id}`);
         
         if (!repoCreated) {
@@ -55,16 +53,27 @@ const InternshipWorkspace = ({ user }) => {
   };
 
   const connectGitHub = async () => {
-    // Redirects user to GitHub to authorize the app
-    // CRITICAL: 'repo' scope gives permission to create the repository and push code
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'github',
-      options: {
-        scopes: 'repo', 
-        redirectTo: window.location.href // Returns to this page after login
-      }
+      options: { scopes: 'repo', redirectTo: window.location.href }
     });
     if (error) alert("Connection Failed: " + error.message);
+  };
+
+  // --- NEW FUNCTION: FORCE RE-CREATE REPO ---
+  const handleManualRepair = async () => {
+    if(!confirm("This will recreate the 'foxbird-internship' repository on your GitHub if it is missing. Continue?")) return;
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.provider_token) {
+        // 1. Clear local memory
+        localStorage.removeItem(`foxbird_repo_${user.id}`);
+        // 2. Try creating again
+        await createInternshipRepo(session.provider_token, session.user.user_metadata.user_name);
+    } else {
+        alert("Session expired. Please reconnect GitHub.");
+        connectGitHub();
+    }
   };
 
   const createInternshipRepo = async (token, username) => {
@@ -78,7 +87,7 @@ const InternshipWorkspace = ({ user }) => {
         });
 
         if (check.status === 404) {
-            // Step B: Repo doesn't exist, so CREATE it
+            // Step B: CREATE it
             const create = await fetch(`https://api.github.com/user/repos`, {
                 method: 'POST',
                 headers: { 
@@ -88,30 +97,32 @@ const InternshipWorkspace = ({ user }) => {
                 body: JSON.stringify({
                     name: repoName,
                     description: "My Internship Portfolio powered by Fox Bird",
-                    private: false, // Public so it can be shared
-                    auto_init: true // Creates a README automatically
+                    private: false, 
+                    auto_init: true 
                 })
             });
 
             if (!create.ok) throw new Error("Failed to create repo");
-            alert("Success! We created a 'foxbird-internship-portfolio' repo in your GitHub.");
+            alert("Repository 'foxbird-internship' has been restored!");
         } else {
-             console.log("Repo already exists, skipping creation.");
+             console.log("Repo found. Reconnecting...");
+             alert("Repository found and reconnected!");
         }
 
-        // Mark as done so we don't try again
+        // Set flag back to true
         localStorage.setItem(`foxbird_repo_${user.id}`, 'true');
         setRepoStatus('ready');
 
     } catch (err) {
         console.error("Repo Setup Error:", err);
-        alert("Could not create GitHub repo automatically. Please create 'foxbird-internship-portfolio' manually.");
+        alert("Error: " + err.message);
         setRepoStatus('idle');
     }
   };
 
-  // --- 2. WORKSPACE DATA LOGIC ---
-
+  // ... (Keep fetchWorkspaceData, performMove, handleDrop, handleVerificationSuccess, handleOpenSubmitModal, submitProject, toggleTaskExpand exactly as they were) ...
+  // [Paste those functions here unchanged]
+  
   const saveBoardState = async (newState, subId) => {
     const { error } = await supabase.from('internship_submissions').update({ board_state: newState }).eq('id', subId);
     if (error) console.error("Auto-save failed:", error);
@@ -119,22 +130,10 @@ const InternshipWorkspace = ({ user }) => {
 
  const fetchWorkspaceData = async () => {
     try {
-      // 1. Fetch the "Master" Project Data (Contains the new Test Cases)
-      const { data: proj, error: projError } = await supabase
-        .from('internship_projects')
-        .select('*')
-        .eq('id', projectId)
-        .single();
-      
+      const { data: proj, error: projError } = await supabase.from('internship_projects').select('*').eq('id', projectId).single();
       if (projError) throw projError;
 
-      // 2. Fetch the User's Personal Progress
-      const { data: sub, error: subError } = await supabase
-        .from('internship_submissions')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('project_id', projectId)
-        .single();
+      const { data: sub, error: subError } = await supabase.from('internship_submissions').select('*').eq('user_id', user.id).eq('project_id', projectId).single();
 
       if (subError) {
         alert("Not enrolled in this internship.");
@@ -145,45 +144,28 @@ const InternshipWorkspace = ({ user }) => {
       setProject(proj);
       setSubmission(sub);
 
-      // --- SMART SYNC LOGIC ---
-      // We need to check if the user's board has the OLD tasks (missing test_cases)
-      // or if the Project was updated with new tasks.
-      
       let boardIsStale = false;
-      
-      // Check if board exists
       if (sub.board_state && (sub.board_state.todo.length || sub.board_state.in_progress.length || sub.board_state.done.length)) {
-          // Check the first task found to see if it has 'test_cases' or 'starter_code'
           const allTasks = [...sub.board_state.todo, ...sub.board_state.in_progress, ...sub.board_state.done];
           if (allTasks.length > 0) {
-              // If the tasks don't have the new fields, it's stale!
               const sampleTask = allTasks[0];
               if (!sampleTask.test_cases && !sampleTask.testCases) {
                   boardIsStale = true;
               }
           }
       } else {
-          // No board state exists, so we treat it as "new"
           boardIsStale = true; 
       }
 
       if (boardIsStale) {
-        console.log("⚠️ Board is stale or empty. Refreshing from Master Project...");
-        
-        // REFRESH: Load fresh tasks from the Project definition
         const initialTasks = proj.tasks?.map((t, i) => {
-            // Handle potentially different ID formats
             const tId = t.id || `task-${i}`;
             return { ...t, id: tId }; 
         }) || [];
-        
         const newState = { todo: initialTasks, in_progress: [], done: [] };
-        
         setTasks(newState);
-        // Save this fresh state to the DB so we don't have to refresh next time
         saveBoardState(newState, sub.id);
       } else {
-        // State is good, just load it
         setTasks(sub.board_state);
       }
 
@@ -208,7 +190,6 @@ const InternshipWorkspace = ({ user }) => {
     const taskId = e.dataTransfer.getData("taskId");
     const sourceCol = e.dataTransfer.getData("sourceCol");
     if (!taskId || sourceCol === targetCol) return;
-
     if (sourceCol === 'done') return;
 
     const taskToMove = tasks[sourceCol].find(t => t.id === taskId);
@@ -241,20 +222,16 @@ const InternshipWorkspace = ({ user }) => {
   const submitProject = async () => {
     const { repo, live } = submitForm;
     if (!repo || !repo.includes("github.com")) return alert("Invalid GitHub URL.");
-
     if (!confirm("Submit project for final review? This will lock your board.")) return;
 
     setLoading(true);
     try {
-        const { error: updateError } = await supabase
-        .from('internship_submissions')
-        .update({ 
+        const { error: updateError } = await supabase.from('internship_submissions').update({ 
             repo_link: repo,
             live_link: live || null,
             status: 'completed',
             submitted_at: new Date()
-        })
-        .eq('id', submission.id);
+        }).eq('id', submission.id);
 
         if (updateError) throw updateError;
         const { error: rpcError } = await supabase.rpc('complete_internship', { submission_uuid: submission.id });
@@ -278,14 +255,13 @@ const InternshipWorkspace = ({ user }) => {
 
   if (loading) return <div className="h-screen flex items-center justify-center bg-black text-white"><Loader2 className="animate-spin text-indigo-500" size={40}/></div>;
 
-  // Calculate Progress
   const totalTasks = tasks.todo.length + tasks.in_progress.length + tasks.done.length;
   const progressPercent = totalTasks === 0 ? 0 : Math.round((tasks.done.length / totalTasks) * 100);
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-white flex flex-col font-sans">
       
-      {/* HEADER WITH GITHUB CONNECT */}
+      {/* HEADER */}
       <header className="h-16 border-b border-gray-800 flex items-center justify-between px-6 bg-[#111]">
         <div className="flex items-center gap-4">
           <button onClick={() => navigate('/student/internships')} className="p-2 hover:bg-gray-800 rounded-full transition-colors"><ArrowLeft size={20} /></button>
@@ -296,24 +272,32 @@ const InternshipWorkspace = ({ user }) => {
         </div>
 
         <div className="flex items-center gap-3">
-            {/* The Magic GitHub Button */}
-            <button 
-                onClick={!isGithubConnected ? connectGitHub : null}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold border transition-all ${
-                isGithubConnected 
-                    ? 'bg-gray-800 text-green-400 border-green-500/30 cursor-default' 
-                    : 'bg-[#24292e] text-white border-gray-700 hover:bg-[#2f363d]'
-                }`}
-            >
-                {repoStatus === 'creating' ? (
-                   <Loader2 className="animate-spin" size={16}/> 
-                ) : (
-                   <Github size={16} />
-                )}
-                
-                {repoStatus === 'creating' ? "Setting up Repo..." : 
-                 isGithubConnected ? "GitHub Connected" : "Connect GitHub"}
-            </button>
+            
+            {/* UPDATED GITHUB BUTTON */}
+            {isGithubConnected ? (
+                // If Connected, show REPAIR option
+                <div className="flex items-center gap-2">
+                    <span className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-500/10 text-green-500 text-xs font-bold border border-green-500/20 cursor-default">
+                        <Github size={16} /> Connected
+                    </span>
+                    <button 
+                        onClick={handleManualRepair}
+                        className="p-2 hover:bg-gray-800 rounded-lg text-gray-400 hover:text-white transition-colors"
+                        title="Repository missing? Click to Repair"
+                    >
+                        <RefreshCw size={14} />
+                    </button>
+                </div>
+            ) : (
+                // If Disconnected
+                <button 
+                    onClick={connectGitHub}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold border bg-[#24292e] text-white border-gray-700 hover:bg-[#2f363d] transition-all"
+                >
+                    {repoStatus === 'creating' ? <Loader2 className="animate-spin" size={16}/> : <Github size={16} />}
+                    {repoStatus === 'creating' ? "Setting up Repo..." : "Connect GitHub"}
+                </button>
+            )}
 
             <button onClick={handleOpenSubmitModal} className="flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-bold shadow-lg shadow-indigo-500/20">
                 Submit Project
@@ -325,10 +309,8 @@ const InternshipWorkspace = ({ user }) => {
       <div className="flex-1 p-8 overflow-y-auto bg-[#050505]">
         <div className="max-w-7xl mx-auto">
             
-            {/* MILESTONE JOURNEY (PwC Style) */}
             <MilestoneJourney progress={progressPercent} />
 
-            {/* KANBAN BOARD */}
             <div className="flex gap-6 h-[600px] overflow-x-auto pb-4">
             {['todo', 'in_progress', 'done'].map(col => (
                 <div key={col} onDragOver={(e) => e.preventDefault()} onDrop={(e) => handleDrop(e, col)} className={`flex-1 min-w-[300px] rounded-2xl border flex flex-col transition-colors ${col === 'done' ? 'bg-[#111] border-green-900/30' : 'bg-[#111] border-gray-800'}`}>
@@ -364,7 +346,6 @@ const InternshipWorkspace = ({ user }) => {
                             )}
                         </div>
                         
-                        {/* REQUIREMENTS PREVIEW */}
                         {task.requirements && (
                             <div className="text-[10px] text-gray-500 mt-2 bg-black/30 p-2 rounded border border-white/5">
                                 <div className="flex items-start gap-1">
@@ -429,7 +410,7 @@ const InternshipWorkspace = ({ user }) => {
       {verifyingTask && (
         <TaskVerificationModal 
            task={verifyingTask.task}
-           projectTitle={project?.title || "Internship_Project"} // <--- ADD THIS PROP
+           projectTitle={project?.title || "Internship_Project"} 
            onClose={() => setVerifyingTask(null)}
            onSuccess={handleVerificationSuccess}
         />
@@ -453,7 +434,6 @@ const InternshipWorkspace = ({ user }) => {
   );
 };
 
-// --- COMPONENT: MILESTONE TRACKER ---
 const MilestoneJourney = ({ progress }) => {
     return (
       <div className="bg-[#111] p-6 rounded-2xl border border-gray-800 mb-8 relative overflow-hidden">
@@ -469,19 +449,16 @@ const MilestoneJourney = ({ progress }) => {
          </div>
   
          <div className="relative h-32 w-full">
-            {/* Background Grid */}
             <div className="absolute inset-0 grid grid-cols-4 gap-4 opacity-10">
                <div className="border-r border-white/20"></div>
                <div className="border-r border-white/20"></div>
                <div className="border-r border-white/20"></div>
             </div>
   
-            {/* Milestones */}
             <MilestonePoint percent={10} label="Onboard" current={progress} left="10%" bottom="10%" />
             <MilestonePoint percent={50} label="Mid-Term" current={progress} left="50%" bottom="40%" />
             <MilestonePoint percent={100} label="Launch" current={progress} left="90%" bottom="80%" />
   
-            {/* SVG Curve Line */}
             <svg className="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none">
                <path 
                  d="M 50 120 C 200 120, 500 80, 1000 20" 
