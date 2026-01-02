@@ -29,46 +29,19 @@ export default function ReviewDashboard() {
   };
 
   // --- APPROVE LOGIC ---
-  const handleApprove = async (submissionId) => {
-    if(!confirm("Approve this project and generate certificate?")) return;
-
-    try {
-        // 1. Mark as Completed
-        const { error: updateError } = await supabase
-            .from('internship_submissions')
-            .update({ status: 'completed' })
-            .eq('id', submissionId);
-        
-        if (updateError) throw updateError;
-
-        // 2. TRIGGER CERTIFICATE GENERATION (The logic we moved from Student side)
-        const { error: rpcError } = await supabase.rpc('complete_internship', { 
-            submission_uuid: submissionId 
-        });
-        
-        if (rpcError) throw rpcError;
-
-        alert("Project Approved & Certificate Generated!");
-        fetchPendingSubmissions(); // Refresh list
-
-    } catch (err) {
-        console.error(err);
-        alert("Approval failed: " + err.message);
-    }
-  };
-
+  
   // --- REJECT LOGIC ---
+ // --- REJECT LOGIC (Fixed Column Name) ---
   const handleReject = async (submissionId) => {
     const reason = prompt("Enter reason for rejection (Student will see this):");
     if (!reason) return;
 
     try {
-        // Send back to 'in_progress' so they can fix it
         const { error } = await supabase
             .from('internship_submissions')
             .update({ 
-                status: 'in_progress',
-                feedback: reason // Ensure you have a 'feedback' column in DB
+                status: 'in_progress',    // Send back to student
+                admin_feedback: reason    // <--- FIXED: Changed 'feedback' to 'admin_feedback'
             })
             .eq('id', submissionId);
 
@@ -77,7 +50,40 @@ export default function ReviewDashboard() {
         fetchPendingSubmissions();
 
     } catch (err) {
-        alert("Action failed");
+        console.error("Reject Error:", err); // Log the actual error to console
+        alert("Action failed: " + err.message);
+    }
+  };
+
+  // --- APPROVE LOGIC (Cleanup Feedback) ---
+  const handleApprove = async (submissionId) => {
+    if(!confirm("Approve this project and generate certificate?")) return;
+
+    try {
+        // 1. Mark as Completed AND Clear any old rejection feedback
+        const { error: updateError } = await supabase
+            .from('internship_submissions')
+            .update({ 
+                status: 'completed',
+                admin_feedback: null // <--- ADDED: Clear old feedback so it doesn't persist
+            })
+            .eq('id', submissionId);
+        
+        if (updateError) throw updateError;
+
+        // 2. TRIGGER CERTIFICATE GENERATION
+        const { error: rpcError } = await supabase.rpc('complete_internship', { 
+            submission_uuid: submissionId 
+        });
+        
+        if (rpcError) throw rpcError;
+
+        alert("Project Approved & Certificate Generated!");
+        fetchPendingSubmissions(); 
+
+    } catch (err) {
+        console.error(err);
+        alert("Approval failed: " + err.message);
     }
   };
 

@@ -12,7 +12,7 @@ export default function SolveProblemPage() {
   const [loading, setLoading] = useState(true);
   const [pushingToGithub, setPushingToGithub] = useState(false);
   
-  // LOCK: Use Ref for immediate synchronous locking prevents race conditions better than state
+  // LOCK: Prevents double-clicking submit
   const isSubmittingRef = useRef(false);
 
   // --- FETCH PROBLEM ---
@@ -40,7 +40,7 @@ export default function SolveProblemPage() {
     if (questionId) fetchProblem();
   }, [questionId, navigate]);
 
-  // --- HELPER: CREATE REPO IF MISSING ---
+  // --- HELPER: AUTO-CREATE REPO IF MISSING ---
   const createRepoIfNeeded = async (token, repoName) => {
       try {
           const createRes = await fetch(`https://api.github.com/user/repos`, {
@@ -109,7 +109,7 @@ export default function SolveProblemPage() {
           console.log("Repo not found. Creating...");
           const created = await createRepoIfNeeded(providerToken, repoName);
           if (created) {
-              // Retry Upload
+              // Retry Upload immediately
               uploadRes = await fetch(`https://api.github.com/repos/${username}/${repoName}/contents/${filePath}`, {
                   method: 'PUT',
                   headers: { 
@@ -133,12 +133,11 @@ export default function SolveProblemPage() {
 
   // --- SUBMISSION HANDLER ---
   const handleComplete = async (score, submittedCode, language) => { 
-    // LOCK: Prevent double execution
+    // LOCK: Prevent double clicks
     if (isSubmittingRef.current) return; 
     
     if(score === 100) {
-      // Set Lock
-      isSubmittingRef.current = true;
+      isSubmittingRef.current = true; // Engage Lock
       
       try {
         confetti();
@@ -156,42 +155,31 @@ export default function SolveProblemPage() {
         const isAlreadySolved = existingSolution && existingSolution.status === 'Solved';
 
         // 2. SAVE to Database
+        // NOTE: The Trigger 'on_solution_solved' will see this INSERT and add coins automatically!
         const { error: saveError } = await supabase.from('student_solutions').upsert({
           user_id: user.id,
           question_id: questionId,
           status: 'Solved',
-          earned_coins: isAlreadySolved ? 0 : reward, 
+          earned_coins: isAlreadySolved ? 0 : reward, // Trigger likely uses this value
           code_submitted: submittedCode,
           language: language            
         }, { onConflict: 'user_id, question_id' });
 
         if (saveError) {
           console.error("Error saving solution:", saveError);
-          isSubmittingRef.current = false; // Release lock on error
+          isSubmittingRef.current = false;
           return; 
         }
 
-        // 3. PUSH TO GITHUB (Now robust with auto-create)
         const githubSuccess = await pushToGitHub(problem.title, submittedCode, language);
 
-        // 4. REWARD LOGIC (Prevents Double Coins)
-        let msg = "";
+       
         
+        let msg = "";
         if (!isAlreadySolved) {
-          // --- ⚠️ CRITICAL: DOUBLE COIN FIX ---
-          // If you added a Database Trigger to 'student_solutions' earlier, 
-          // COMMENT OUT the following 'supabase.rpc' block.
-          // Otherwise, keep it.
-          
-          const { error: rpcError } = await supabase.rpc('increment_profile_coins', { p_amount: reward });
-          
-          if (rpcError) {
-             console.error("Wallet error (might be duplicate):", rpcError);
-          } else {
-             msg = `Problem Solved! +${reward} Coins Added.`;
-          }
+           msg = `Problem Solved! +${reward} Coins Added.`;
         } else {
-          msg = "Problem Solved! (You have already earned coins for this problem).";
+           msg = "Problem Solved! (Already earned coins).";
         }
 
         if (githubSuccess) msg += " Code pushed to GitHub! 🚀";
@@ -201,8 +189,8 @@ export default function SolveProblemPage() {
 
       } catch (error) {
         console.error("Submission Error:", error);
-        alert("Something went wrong during submission.");
-        isSubmittingRef.current = false; // Release lock
+        alert("Something went wrong.");
+        isSubmittingRef.current = false;
       }
     } else {
         alert("Keep trying! You need to pass all test cases.");
