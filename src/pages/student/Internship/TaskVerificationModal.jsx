@@ -41,7 +41,7 @@ export default function TaskVerificationModal({ task, projectTitle, onClose, onS
       if (!providerToken) throw new Error("GitHub Token Missing. Please click 'Connect GitHub' in the workspace.");
 
       const username = session.user?.user_metadata?.user_name;
-      const repoName = "foxbird-internship-portfolio";
+      const repoName = "foxbird-internship";
       
       if (!username) throw new Error("Could not find GitHub username.");
 
@@ -82,7 +82,7 @@ export default function TaskVerificationModal({ task, projectTitle, onClose, onS
       });
 
       if (!commitRes.ok) {
-        if (commitRes.status === 404) throw new Error("Repo 'foxbird-internship-portfolio' not found. Please re-connect GitHub.");
+        if (commitRes.status === 404) throw new Error("Repo 'foxbird-internship' not found. Please re-connect GitHub.");
         throw new Error("GitHub API Error: " + commitRes.statusText);
       }
 
