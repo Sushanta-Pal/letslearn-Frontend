@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Mic, BookOpen, Code, Trophy, Star, Loader2, Shuffle, Key, Clock, Lock, CheckCircle, ArrowRight, AlertTriangle, Camera } from "lucide-react";
+import { Mic, BookOpen, Code, Loader2, Shuffle, Camera, Lock, CheckCircle, AlertTriangle } from "lucide-react";
 import { supabase } from "../../supabaseClient";
 
 // Import Modules
@@ -12,7 +12,7 @@ export default function MockInterviewView({ user, initialSessionId }) {
   // --- STATE ---
   const [activeSessionId, setActiveSessionId] = useState(initialSessionId || null);
   const [sessionData, setSessionData] = useState(null); 
-  const [stage, setStage] = useState("lobby"); 
+  const [stage, setStage] = useState("lobby"); // lobby, setup_proctoring, dashboard, modules...
   
   const [scores, setScores] = useState({ comm: 0, tech: 0, coding: 0 });
   const [unlocked, setUnlocked] = useState({ tech: false, coding: false });
@@ -56,49 +56,51 @@ export default function MockInterviewView({ user, initialSessionId }) {
       setScores({ comm: session.communication_score || 0, tech: session.technical_score || 0, coding: session.coding_score || 0 });
       setUnlocked({ tech: (session.communication_score || 0) > 0, coding: (session.technical_score || 0) > 0 });
       
-      if (session.status === 'completed') setStage("summary");
-      else setStage("dashboard");
+      if (session.status === 'completed') {
+          setStage("summary");
+      } else {
+          // --- FIX: Don't go to dashboard yet. Go to setup to force camera enable ---
+          setStage("setup_proctoring");
+      }
 
     } catch (err) { console.error(err); setStage("lobby"); } finally { setLoading(false); }
   };
 
-  // --- 2. PROCTORING LOGIC (FIXED) ---
-  
+  // --- 2. PROCTORING LOGIC ---
   const enableProctoring = async () => {
     try {
-      // 1. Request Fullscreen FIRST (Must happen directly on click)
+      // 1. Request Fullscreen FIRST
       const elem = document.documentElement;
-      if (elem.requestFullscreen) {
-        await elem.requestFullscreen();
-      } else if (elem.webkitRequestFullscreen) { /* Safari */
-        await elem.webkitRequestFullscreen();
-      }
+      if (elem.requestFullscreen) await elem.requestFullscreen();
+      else if (elem.webkitRequestFullscreen) await elem.webkitRequestFullscreen();
 
-      // 2. Request Camera SECOND (After fullscreen is active)
+      // 2. Request Camera SECOND
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       setCameraStream(stream);
       setIsProctored(true);
-      return true; // Success
+      return true; 
 
     } catch (err) {
       console.error(err);
       alert("Proctoring Failed: Camera permission and Fullscreen are REQUIRED.");
-      
-      // Cleanup if failed
       if (document.fullscreenElement) document.exitFullscreen();
       setIsProctored(false);
-      return false; // Failed
+      return false;
     }
+  };
+
+  const handleResumeProctoring = async () => {
+      const success = await enableProctoring();
+      if (success) setStage("dashboard");
   };
 
   // Attach Security Listeners
   useEffect(() => {
-    if (!isProctored || stage === 'lobby' || stage === 'summary') return;
+    if (!isProctored || ['lobby', 'summary', 'setup_proctoring'].includes(stage)) return;
 
     const handleVisibilityChange = () => {
       if (document.hidden) terminateSession("Tab Switching / Minimized Window");
     };
-
     const handleFullscreenChange = () => {
       if (!document.fullscreenElement) terminateSession("Exited Fullscreen Mode");
     };
@@ -112,14 +114,12 @@ export default function MockInterviewView({ user, initialSessionId }) {
     };
   }, [isProctored, stage]);
 
-  // Video Stream Connection
   useEffect(() => {
     if (videoRef.current && cameraStream) {
       videoRef.current.srcObject = cameraStream;
     }
   }, [cameraStream, stage]);
 
-  // Terminate Session
   const terminateSession = async (reason) => {
     setIsProctored(false);
     if (cameraStream) cameraStream.getTracks().forEach(track => track.stop());
@@ -127,9 +127,6 @@ export default function MockInterviewView({ user, initialSessionId }) {
 
     await supabase.from('mock_interview_sessions').update({ 
       status: 'disqualified', 
-      communication_score: 0, 
-      technical_score: 0, 
-      coding_score: 0,
       metadata: { ...sessionData, disqualification_reason: reason }
     }).eq('id', activeSessionId);
 
@@ -140,11 +137,9 @@ export default function MockInterviewView({ user, initialSessionId }) {
 
   // --- ACTIONS ---
   const handleStartSession = async (practiceSet) => {
-    // 1. Attempt to enable proctoring
     const success = await enableProctoring();
-    if (!success) return; // Stop if user denied camera or fullscreen
+    if (!success) return; 
 
-    // 2. Initialize Session in DB
     try {
       const { data, error } = await supabase.from('mock_interview_sessions').insert([{
           user_id: user.id, user_email: user.email, status: 'in_progress',
@@ -160,7 +155,7 @@ export default function MockInterviewView({ user, initialSessionId }) {
       setUnlocked({ tech: false, coding: false });
     } catch(err) { 
         alert("Error starting session"); 
-        if (document.fullscreenElement) document.exitFullscreen(); // Exit if DB error
+        if (document.fullscreenElement) document.exitFullscreen(); 
     }
   };
 
@@ -186,14 +181,13 @@ export default function MockInterviewView({ user, initialSessionId }) {
     setActiveSessionId(null);
   };
 
-  // --- RENDER ---
   if (loading) return <div className="h-screen flex items-center justify-center bg-black text-[#FF4A1F]"><Loader2 className="animate-spin" size={40}/></div>;
 
   return (
     <div className="min-h-screen bg-black text-white font-sans selection:bg-[#FF4A1F] selection:text-black">
       
       {/* PROCTORING OVERLAY */}
-      {isProctored && stage !== 'lobby' && stage !== 'summary' && (
+      {isProctored && !['lobby', 'summary', 'setup_proctoring'].includes(stage) && (
         <div className="fixed bottom-4 right-4 z-50 w-48 h-36 bg-black border-2 border-red-500 rounded-xl overflow-hidden shadow-2xl shadow-red-900/50">
             <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover transform scale-x-[-1]" />
             <div className="absolute top-2 left-2 flex items-center gap-1 bg-red-600 px-2 py-0.5 rounded text-[10px] font-bold animate-pulse">
@@ -202,7 +196,7 @@ export default function MockInterviewView({ user, initialSessionId }) {
         </div>
       )}
 
-      {/* LOBBY VIEW */}
+      {/* 1. LOBBY VIEW */}
       {stage === "lobby" && (
         <div className="max-w-6xl mx-auto p-10 space-y-12">
            <div className="text-center space-y-4">
@@ -227,35 +221,30 @@ export default function MockInterviewView({ user, initialSessionId }) {
                  </div>
               </div>
            </div>
-
-           {/* History */}
-           <div className="bg-[#111] border border-gray-800 rounded-3xl p-8">
-              <h3 className="text-xl font-bold mb-6">Recent Attempts</h3>
-              <table className="w-full text-left text-sm text-gray-400">
-                <thead><tr className="border-b border-gray-800 text-gray-600 uppercase text-xs"><th className="py-3">Date</th><th className="py-3">Status</th><th className="py-3">Score</th></tr></thead>
-                <tbody>
-                  {history.map(h => (
-                    <tr key={h.id} className="border-b border-gray-800/50 hover:bg-white/5">
-                      <td className="py-3">{new Date(h.created_at).toLocaleDateString()}</td>
-                      <td className="py-3">
-                        <span className={`px-2 py-1 rounded text-xs font-bold ${
-                            h.status === 'disqualified' ? 'bg-red-500/20 text-red-500' : 
-                            h.status === 'completed' ? 'bg-green-500/20 text-green-500' : 'bg-yellow-500/20 text-yellow-500'
-                        }`}>
-                            {h.status === 'disqualified' ? 'TERMINATED' : h.status}
-                        </span>
-                      </td>
-                      <td className="py-3">{h.technical_score + h.communication_score + h.coding_score}/300</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-           </div>
         </div>
       )}
 
-      {/* ACTIVE SESSION VIEWS */}
-      {stage !== "lobby" && stage !== "summary" && (
+      {/* 2. SETUP PROCTORING (The Fix) */}
+      {stage === "setup_proctoring" && (
+        <div className="flex flex-col items-center justify-center min-h-screen bg-black text-center p-6 animate-in fade-in">
+            <div className="w-24 h-24 bg-red-500/10 rounded-full flex items-center justify-center mb-6 text-red-500 border border-red-500/20">
+                <Camera size={48} />
+            </div>
+            <h1 className="text-4xl font-bold text-white mb-4">Session Paused</h1>
+            <p className="text-gray-400 max-w-md mb-8 text-lg">
+                To resume your interview, we need to re-enable the secure proctoring environment (Camera & Fullscreen).
+            </p>
+            <button 
+                onClick={handleResumeProctoring}
+                className="bg-[#FF4A1F] hover:bg-orange-600 text-black font-bold py-4 px-10 rounded-2xl text-lg transition-all transform hover:scale-105 shadow-xl shadow-orange-900/20"
+            >
+                Enable Camera & Resume
+            </button>
+        </div>
+      )}
+
+      {/* 3. ACTIVE SESSION VIEWS */}
+      {stage !== "lobby" && stage !== "summary" && stage !== "setup_proctoring" && (
          <>
             {/* Dashboard / Hub */}
             {stage === "dashboard" && (
@@ -282,7 +271,7 @@ export default function MockInterviewView({ user, initialSessionId }) {
          </>
       )}
 
-      {/* SUMMARY VIEW */}
+      {/* 4. SUMMARY VIEW */}
       {stage === "summary" && (
          <div className="min-h-screen flex items-center justify-center p-6">
             <div className="bg-[#111] border border-gray-800 rounded-3xl p-10 text-center max-w-xl w-full">

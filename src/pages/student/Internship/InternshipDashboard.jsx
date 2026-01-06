@@ -31,27 +31,14 @@ const InternshipDashboard = () => {
       if (!user) return;
       setUser(user);
 
-      console.log("Fetching dashboard data for:", user.id);
-
-      // --- 1. FETCH DATA SEPARATELY (Avoids 400 Error on Joins) ---
+      // --- 1. FETCH DATA ---
       const [submissionsRes, interviewsRes, projectsRes, qualifiersRes] = await Promise.all([
-        // A. Submissions (Get everything for this user)
-        supabase.from('internship_submissions')
-  .select('*')
-  .eq('user_id', user.id)
-  .order('started_at', { ascending: false }), // <--- Use started_at instead
-        // B. Interview Count
+        supabase.from('internship_submissions').select('*').eq('user_id', user.id).order('started_at', { ascending: false }),
         supabase.from('mock_interview_sessions').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
-        
-        // C. All Projects
         supabase.from('internship_projects').select('*').order('created_at', { ascending: false }),
-
-        // D. Qualifiers Passed
         supabase.from('mock_interview_sessions').select('metadata, technical_score, coding_score, status').eq('user_id', user.id).eq('status', 'completed')
       ]);
 
-      if (submissionsRes.error) console.error("Submissions Fetch Error:", submissionsRes.error);
-      
       const submissions = submissionsRes.data || [];
       const allProjects = projectsRes.data || [];
       const qualifiers = qualifiersRes.data || [];
@@ -63,8 +50,7 @@ const InternshipDashboard = () => {
         offers: submissions.filter(s => s.status === 'qualified').length
       });
 
-      // --- 3. MANUAL MERGE (Robust Logic) ---
-      // Create Lookup Maps
+      // --- 3. MERGE DATA ---
       const subMap = new Map(submissions.map(s => [s.project_id, s]));
       const qualMap = new Map(qualifiers.map(q => [q.metadata?.set_id, q]));
       const projectMap = new Map(allProjects.map(p => [p.id, p]));
@@ -76,32 +62,22 @@ const InternshipDashboard = () => {
       allProjects.forEach(project => {
         const submission = subMap.get(project.id);
         const qualifier = qualMap.get(project.qualifying_set_id);
-
-       
         
-        // Determine UI State
         let uiState = 'APPLY';
         
         if (submission) {
-            // Check specific statuses from your DB
             if (submission.status === 'completed') uiState = 'DONE';
             else if (submission.is_paid === true || submission.status === 'hired') uiState = 'WORK';
             else if (submission.status === 'qualified') uiState = 'OFFER';
             else uiState = 'APPLIED'; 
         } else if (qualifier) {
-            // CHECK SCORES
             const passed = (qualifier.technical_score || 0) >= 60 && (qualifier.coding_score || 0) >= 60;
-            
-            if (passed) {
-                uiState = 'OFFER'; // <--- THIS LINE WAS MISSING
-            } else {
-                uiState = 'REJECTED'; 
-            }
+            if (passed) uiState = 'OFFER';
+            else uiState = 'REJECTED'; 
         }
 
         const projectData = { ...project, uiState, submission };
 
-        // Segregate
         if (uiState === 'WORK' || uiState === 'DONE') {
             myActive.push(projectData);
         } else {
@@ -109,10 +85,8 @@ const InternshipDashboard = () => {
         }
       });
 
-      // Build Application History manually since we didn't join in the API
       submissions.forEach(sub => {
           const project = projectMap.get(sub.project_id);
-          // Determine local UI state again for the history table buttons
           let histState = 'APPLIED';
           if (sub.status === 'completed') histState = 'DONE';
           else if (sub.is_paid) histState = 'WORK';
@@ -170,11 +144,20 @@ const InternshipDashboard = () => {
      }
   };
 
+  // --- CRITICAL FIX: Robust Accept Logic ---
+ // --- REPLACE YOUR EXISTING onPaymentSuccess FUNCTION WITH THIS ---
   const onPaymentSuccess = async () => {
     try {
+      // 1. CAPTURE ID FIRST (Critical Step)
+      if (!selectedOffer || !selectedOffer.id) {
+          throw new Error("Project ID missing. Please try again.");
+      }
+      const jobId = selectedOffer.id;
+
+      // 2. SAVE TO DB
       const { error } = await supabase.from('internship_submissions').upsert({
          user_id: user.id,
-         project_id: selectedOffer.id,
+         project_id: jobId, 
          is_paid: true,
          status: 'hired',
          started_at: new Date(),
@@ -182,11 +165,17 @@ const InternshipDashboard = () => {
       }, { onConflict: 'user_id, project_id' }); 
 
       if (error) throw error;
+      
+      // 3. CLEANUP
       setSelectedOffer(null);
-      fetchDashboardData(); 
-      navigate(`/student/internship/${selectedOffer.id}`);
+      await fetchDashboardData(); 
+      
+      // 4. NAVIGATE USING CAPTURED VARIABLE
+      navigate(`/student/internship/${jobId}`);
+      
     } catch (err) {
-      alert("Payment record failed.");
+      console.error(err);
+      alert("Payment record failed: " + err.message);
     }
   };
 
@@ -195,7 +184,7 @@ const InternshipDashboard = () => {
   return (
     <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
       
-      {/* 1. HERO HEADER */}
+      {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-end gap-6 border-b border-white/5 pb-8">
         <div>
            <div className="flex items-center gap-2 mb-2">
@@ -205,15 +194,13 @@ const InternshipDashboard = () => {
            <h1 className="text-4xl font-extrabold text-white tracking-tight">Internship Hub</h1>
            <p className="text-gray-400 mt-2 text-lg">Build real-world experience. Get hired.</p>
         </div>
-        
-        {/* User Stats Pill */}
         <div className="flex gap-4">
             <StatPill label="Applied" value={stats.applications} />
             <StatPill label="Offers" value={stats.offers} highlight={stats.offers > 0} />
         </div>
       </div>
 
-      {/* 2. MY WORKSPACE (Active/Completed) */}
+      {/* MY WORKSPACE */}
       {activeInternships.length > 0 && (
           <section>
               <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
@@ -255,7 +242,7 @@ const InternshipDashboard = () => {
           </section>
       )}
 
-      {/* 3. EXPLORE OPPORTUNITIES (Marketplace) */}
+      {/* EXPLORE OPPORTUNITIES */}
       <section>
         <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -285,7 +272,6 @@ const InternshipDashboard = () => {
 
                   <div className="flex-1">
                       <p className="text-sm text-gray-400 line-clamp-2 mb-6 leading-relaxed">{job.description}</p>
-                      
                       <div className="flex flex-wrap gap-2 mb-6">
                           <Tag text={job.difficulty} />
                           <Tag text={`${job.price === 0 ? 'Free' : '₹' + job.price}`} color="text-emerald-400" bg="bg-emerald-500/10" border="border-emerald-500/20" />
@@ -308,14 +294,13 @@ const InternshipDashboard = () => {
                     {job.uiState === 'APPLY' && <>Apply Now <ArrowRight size={16}/></>}
                     {job.uiState === 'REJECTED' && "Locked (Cooldown)"}
                   </button>
-
                 </div>
               ))}
             </div>
         )}
       </section>
 
-      {/* 4. APPLICATION HISTORY (Compact) */}
+      {/* APPLICATION HISTORY */}
       {applications.length > 0 && (
           <section className="bg-[#111] border border-white/5 rounded-3xl overflow-hidden mt-12">
              <div className="p-6 border-b border-white/5 flex items-center gap-3">
@@ -371,8 +356,7 @@ const InternshipDashboard = () => {
   );
 };
 
-// --- HELPER COMPONENTS ---
-
+// --- HELPERS ---
 const StatPill = ({ label, value, highlight }) => (
     <div className={`px-4 py-2 rounded-xl border flex items-center gap-2 ${highlight ? 'bg-yellow-500/10 border-yellow-500/20' : 'bg-[#111] border-white/10'}`}>
         <span className={`text-sm font-bold ${highlight ? 'text-yellow-500' : 'text-white'}`}>{value}</span>
@@ -405,15 +389,5 @@ const getGradient = (name = "") => {
     const index = (name?.length || 0) % gradients.length;
     return gradients[index];
 }
-
-const DashboardSkeleton = () => (
-    <div className="space-y-8 p-8 max-w-7xl mx-auto">
-        <div className="h-20 bg-[#111] rounded-3xl animate-pulse w-full"></div>
-        <div className="grid grid-cols-2 gap-6">
-            <div className="h-60 bg-[#111] rounded-3xl animate-pulse"></div>
-            <div className="h-60 bg-[#111] rounded-3xl animate-pulse"></div>
-        </div>
-    </div>
-);
 
 export default InternshipDashboard;
