@@ -1,21 +1,22 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { 
   Play, Send, CheckCircle, XCircle, 
-  Code, Cpu, Clock, Terminal, AlertTriangle, Sparkles, Zap, FileCode, GripVertical 
+  Code, Cpu, Clock, Terminal, AlertTriangle, Sparkles, Zap, FileCode, GripVertical,
+  Globe, Eye, Layout, ListChecks // Added ListChecks icon for Requirements
 } from "lucide-react";
 
-// --- FALLBACK DATA ---
+// --- FALLBACK DATA (For Practice/Interview Mode) ---
 const FALLBACK_PROBLEMS = [
   {
     id: "fallback-1",
     title: "Sum of Two Numbers",
     difficulty: "Easy",
+    // Practice Mode uses 'description'
     description: "Write a program that reads two integers from standard input and prints their sum.",
     testCases: [{ input: "5 10", expected: "15" }],
+    // Practice Mode uses object starterCode
     starterCode: {
-      java: `import java.util.Scanner;\npublic class Main {\n    public static void main(String[] args) {\n        Scanner s = new Scanner(System.in);\n        int a = s.nextInt();\n        int b = s.nextInt();\n        System.out.println(a + b);\n    }\n}`,
-      python: `import sys\ninput_data = sys.stdin.read().split()\nif len(input_data) >= 2:\n    print(int(input_data[0]) + int(input_data[1]))`,
-      cpp: `#include <iostream>\nusing namespace std;\nint main() { int a, b; if(cin >> a >> b) cout << (a+b); return 0; }`
+      java: `import java.util.Scanner;\npublic class Main {\n    public static void main(String[] args) {\n        Scanner s = new Scanner(System.in);\n        int a = s.nextInt();\n        int b = s.nextInt();\n        System.out.println(a + b);\n    }\n}`
     }
   }
 ];
@@ -23,27 +24,45 @@ const FALLBACK_PROBLEMS = [
 const LANGUAGE_VERSIONS = {
   java: { language: "java", version: "15.0.2", file: "Main.java" },
   python: { language: "python", version: "3.10.0", file: "main.py" },
-  cpp: { language: "c++", version: "10.2.0", file: "main.cpp" }
+  cpp: { language: "c++", version: "10.2.0", file: "main.cpp" },
+  javascript: { language: "javascript", version: "18.15.0", file: "script.js" },
+  html: { language: "html", version: "5", file: "index.html" },
+  css: { language: "css", version: "3", file: "style.css" }
 };
 
 const CodingModule = ({ user, sessionId, onComplete, onCancel, problems, isEmbedded = false }) => {
   
-  // --- 1. DATA & STATE ---
+  // --- 1. SMART DATA MAPPING ---
   const activeProblem = useMemo(() => {
+    // If no problem provided, use fallback (Interview Mode)
     const raw = (problems && problems.length > 0) ? problems[0] : FALLBACK_PROBLEMS[0];
+    
     return {
         ...raw,
-        testCases: raw.testCases || raw.test_cases || [],
-        starterCode: raw.starterCode || raw.starter_code || {}
+        // ADAPTER: Check for 'description' (Interview) OR 'requirements' (Internship)
+        description: raw.description || raw.requirements || "No details provided for this task.",
+        
+        // ADAPTER: Handle Snake_Case (DB) vs CamelCase (Frontend)
+        starterCode: raw.starterCode || raw.starter_code || {},
+        
+        testCases: raw.testCases || raw.test_cases || []
     };
   }, [problems]);
 
-  // FIX: Auto-detect language from available starter code (Avoids Java default for Python problems)
+  // --- 2. LANGUAGE DETECTION ---
   const [language, setLanguage] = useState(() => {
-     if (activeProblem.starterCode?.java) return 'java';
-     if (activeProblem.starterCode?.python) return 'python';
-     if (activeProblem.starterCode?.cpp) return 'cpp';
-     return 'java';
+     // Priority 1: DB explicitly sends "language": "html"
+     if (activeProblem.language) return activeProblem.language.toLowerCase();
+     
+     // Priority 2: Guess from starterCode Object keys (Interview Mode)
+     if (typeof activeProblem.starterCode === 'object') {
+        if (activeProblem.starterCode.html) return 'html';
+        if (activeProblem.starterCode.javascript) return 'javascript';
+        if (activeProblem.starterCode.java) return 'java';
+        if (activeProblem.starterCode.python) return 'python';
+        if (activeProblem.starterCode.cpp) return 'cpp';
+     }
+     return 'java'; // Default
   });
 
   const [code, setCode] = useState("");
@@ -53,7 +72,9 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems, isEmbed
   const [finalStatus, setFinalStatus] = useState(null); 
   const [timeLeft, setTimeLeft] = useState(45 * 60);
   
-  // --- 2. LAYOUT RESIZING STATE ---
+  // Preview & Layout State
+  const [viewMode, setViewMode] = useState("console"); 
+  const [htmlPreview, setHtmlPreview] = useState(""); 
   const containerRef = useRef(null); 
   const rightPanelRef = useRef(null); 
   const [leftPanelWidth, setLeftPanelWidth] = useState(40);
@@ -61,9 +82,29 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems, isEmbed
   const [isDraggingSplit, setIsDraggingSplit] = useState(false);
   const [isDraggingConsole, setIsDraggingConsole] = useState(false);
 
-  // --- 3. INIT CODE & TIMER ---
+  // --- 3. CODE INITIALIZATION & FORMATTING ---
   useEffect(() => {
-    const initialCode = activeProblem.starterCode?.[language] || getDefaultStarterCode(language);
+    let initialCode = "";
+
+    // Case A: Starter Code is a simple String (Internship HTML/CSS tasks)
+    if (typeof activeProblem.starterCode === 'string') {
+        initialCode = activeProblem.starterCode;
+    } 
+    // Case B: Starter Code is an Object (Interview/Practice tasks)
+    else if (activeProblem.starterCode && typeof activeProblem.starterCode === 'object') {
+        initialCode = activeProblem.starterCode[language];
+    }
+
+    // FIX: Clean up escaped newlines from DB (Turn "\n" text into real Enters)
+    if (initialCode && typeof initialCode === 'string') {
+        initialCode = initialCode.replace(/\\n/g, '\n');
+    }
+
+    // Case C: Fallback if nothing found
+    if (!initialCode) {
+        initialCode = getDefaultStarterCode(language);
+    }
+
     setCode(initialCode);
   }, [activeProblem, language]);
 
@@ -77,7 +118,7 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems, isEmbed
     return () => clearInterval(timer);
   }, []);
 
-  // --- 4. RESIZING LOGIC ---
+  // --- 4. RESIZING LOGIC (Standard) ---
   useEffect(() => {
     const handleMouseMove = (e) => {
         if (isDraggingSplit && containerRef.current) {
@@ -99,7 +140,7 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems, isEmbed
         document.addEventListener('mousemove', handleMouseMove);
         document.addEventListener('mouseup', handleMouseUp);
         document.body.style.cursor = isDraggingSplit ? 'col-resize' : 'row-resize';
-        document.body.style.userSelect = 'none'; // Prevent highlighting
+        document.body.style.userSelect = 'none'; 
     }
     return () => {
         document.removeEventListener('mousemove', handleMouseMove);
@@ -109,7 +150,6 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems, isEmbed
     };
   }, [isDraggingSplit, isDraggingConsole]);
 
-  // --- 5. EDITOR HANDLERS ---
   const handleKeyDown = (e) => {
     if (e.key === 'Tab') {
         e.preventDefault();
@@ -126,19 +166,19 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems, isEmbed
     alert("⚠️ Pasting is disabled in the Coding Arena.");
   };
 
- const getDefaultStarterCode = (lang) => {
-    // Force 'Main' class structure with necessary imports
-    if(lang === 'java') return `import java.util.*;\nimport java.io.*;\n\npublic class Main {\n    public static void main(String[] args) {\n        // Your code starts here\n        // Do not change 'public class Main'\n    }\n}`;
-    
+  const getDefaultStarterCode = (lang) => {
+    if(lang === 'java') return `import java.util.*;\nimport java.io.*;\n\npublic class Main {\n    public static void main(String[] args) {\n        // Your code starts here\n    }\n}`;
     if(lang === 'python') return `# Write your code here\nimport sys\n`;
     if(lang === 'cpp') return `#include <iostream>\nusing namespace std;\n\nint main() {\n    // Write code here\n    return 0;\n}`;
+    if(lang === 'javascript') return `// Write code to generate HTML output\nconsole.log("<h1>Hello World</h1>");`;
+    if(lang === 'html') return `<!DOCTYPE html>\n<html>\n<body>\n  <h1>My Portfolio</h1>\n  <p>Welcome.</p>\n</body>\n</html>`;
+    if(lang === 'css') return `body {\n  background: #111;\n  color: white;\n}`;
     return "";
   };
 
   const executeCode = async (codeToRun, inputData) => {
-    const config = LANGUAGE_VERSIONS[language];
+    const config = LANGUAGE_VERSIONS[language] || LANGUAGE_VERSIONS.java;
     try {
-      // FIX: Ensure input is always a string to prevent API crashes on Numbers
       const safeInput = (inputData !== undefined && inputData !== null) ? String(inputData) : "";
       
       const response = await fetch("https://emkc.org/api/v2/piston/execute", {
@@ -157,61 +197,79 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems, isEmbed
     }
   };
 
-  // --- 7. ROBUST RUN LOGIC (Fixes Data Flow Bugs) ---
   const handleRun = async () => {
-    if (!activeProblem.testCases || activeProblem.testCases.length === 0) {
-        alert("This problem has no test cases configured.");
+    // A. HANDLE HTML/CSS (Client-Side Render)
+    if (language === 'html' || language === 'css') {
+        setHtmlPreview(code);
+        setConsoleOutput("Rendering preview...");
+        setViewMode("browser"); 
+        if (consoleHeight < 100) setConsoleHeight(300);
         return;
     }
+
+    // B. HANDLE STANDARD LANGUAGES (Server-Side)
+    const hasTestCases = activeProblem.testCases && activeProblem.testCases.length > 0;
+    
     setIsRunning(true);
     setConsoleOutput(null);
     setTestResults([]);
     setFinalStatus(null);
+    setHtmlPreview(""); 
     if (consoleHeight < 100) setConsoleHeight(250);
 
+    // B1. Playground Mode
+    if (!hasTestCases) {
+        const apiResult = await executeCode(code, "");
+        if (apiResult && apiResult.run) {
+            const output = apiResult.run.stdout;
+            setConsoleOutput(output);
+            
+            // Smart Check: If code outputs HTML, show it!
+            if (output && output.trim().startsWith("<")) {
+                setHtmlPreview(output);
+                setViewMode("browser");
+            } else {
+                setViewMode("console");
+            }
+        }
+        setIsRunning(false);
+        return;
+    }
+
+    // B2. Test Case Mode
     const results = [];
     let errorMessage = null;
+    let lastOutput = "";
 
     for (let i = 0; i < activeProblem.testCases.length; i++) {
         const testCase = activeProblem.testCases[i];
         const apiResult = await executeCode(code, testCase.input); 
 
-        // 1. Check API
         if (!apiResult) { errorMessage = "API Connection Failed."; break; }
-
-        // 2. Check Compilation
         if (apiResult.compile && apiResult.compile.code !== 0) {
             errorMessage = `Compilation Error:\n${apiResult.compile.stderr}`;
             break;
         }
-
-        // 3. Check Timeout
         if (apiResult.run && (apiResult.run.signal === 'SIGKILL' || apiResult.run.signal === 'SIGTERM')) {
-            errorMessage = `Time Limit Exceeded on Test Case ${i+1}.\nCheck for infinite loops.`;
+            errorMessage = `Time Limit Exceeded on Test Case ${i+1}.`;
             break;
         }
-
-        // 4. Check Runtime
         if (apiResult.run && apiResult.run.stderr) { 
             errorMessage = `Runtime Error:\n${apiResult.run.stderr}`; 
             break; 
         }
 
-        // 5. VALIDATE OUTPUT (Fixed Data Flow)
         const actualOutput = apiResult.run && apiResult.run.stdout ? apiResult.run.stdout.trim() : "";
-        
-        // FIX: Handle "0" and Numbers safely using String() conversion
+        lastOutput = actualOutput;
+
         const expectedRaw = testCase.expected;
-        const expectedOutput = (expectedRaw !== undefined && expectedRaw !== null) 
-            ? String(expectedRaw).trim() 
-            : "";
-            
+        const expectedOutput = (expectedRaw !== undefined && expectedRaw !== null) ? String(expectedRaw).trim() : "";
         const passed = actualOutput === expectedOutput;
         
         results.push({
             caseIndex: i + 1,
             input: testCase.input,
-            expected: expectedOutput, // Show the string version
+            expected: expectedOutput,
             actual: actualOutput,
             passed: passed
         });
@@ -222,14 +280,25 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems, isEmbed
     if (errorMessage) {
         setFinalStatus("Error");
         setConsoleOutput(errorMessage);
+        setViewMode("console");
     } else {
         const allPassed = results.every(r => r.passed);
         setTestResults(results);
         setFinalStatus(allPassed ? "Accepted" : "Wrong Answer");
+        
+        if (lastOutput && lastOutput.trim().startsWith("<")) {
+            setHtmlPreview(lastOutput);
+        }
     }
   };
 
   const handleSubmit = () => {
+    // For visual tasks (HTML/CSS), we trust the user's check
+    if (language === 'html' || language === 'css') {
+        onComplete(100, code, language);
+        return;
+    }
+
     if (finalStatus !== "Accepted") {
         if(!confirm("Your code has not passed all test cases. Submit anyway?")) return;
     }
@@ -254,7 +323,7 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems, isEmbed
                     <Code size={20} className="text-[#FF4A1F]" />
                 </div>
                 <div>
-                    <h2 className="font-bold text-white text-lg">Coding Challenge</h2>
+                    <h2 className="font-bold text-white text-lg">Coding Arena</h2>
                     <p className="text-xs text-gray-400">Time Limit: 45m</p>
                 </div>
             </div>
@@ -269,10 +338,13 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems, isEmbed
                 <option value="java">☕ Java</option>
                 <option value="python">🐍 Python</option>
                 <option value="cpp">⚡ C++</option>
+                <option value="javascript">🌐 JavaScript</option>
+                <option value="html">🎨 HTML</option>
+                <option value="css">💅 CSS</option>
             </select>
             <button onClick={handleRun} disabled={isRunning} className="flex items-center gap-2 px-5 py-2 bg-white/5 text-white text-sm rounded-xl border border-white/10 hover:bg-white/10 transition-all font-medium disabled:opacity-50">
                {isRunning ? <Cpu className="animate-spin" size={16} /> : <Play size={16} />} 
-               <span>{isRunning ? "Running..." : "Run Code"}</span>
+               <span>{language === 'html' ? "Preview" : isRunning ? "Running..." : "Run Code"}</span>
             </button>
             <button onClick={handleSubmit} className="flex items-center gap-2 px-5 py-2 bg-[#FF4A1F] text-white font-bold text-sm rounded-xl hover:bg-orange-600 transition-all shadow-lg shadow-orange-900/20">
                <span>Submit</span>
@@ -294,17 +366,28 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems, isEmbed
                                 {activeProblem.difficulty || "Medium"}
                             </span>
                         </div>
-                        <p className="text-gray-400 text-sm leading-relaxed whitespace-pre-wrap font-sans">{activeProblem.description}</p>
-                    </div>
-                    <div className="space-y-3">
-                        <div className="flex items-center gap-2"><Sparkles size={16} className="text-[#FF4A1F]"/><h3 className="text-sm font-bold text-white uppercase tracking-wider">Sample Case</h3></div>
-                        <div className="bg-[#1a1a1a] p-5 rounded-2xl border border-white/5 font-mono text-sm">
-                            <div className="space-y-4">
-                                <div><div className="text-gray-500 text-xs mb-2 font-bold uppercase">Input</div><div className="text-white bg-black/50 px-4 py-3 rounded-lg border border-white/5">{activeProblem.testCases?.[0]?.input || "N/A"}</div></div>
-                                <div><div className="text-gray-500 text-xs mb-2 font-bold uppercase">Expected Output</div><div className="text-[#FF4A1F] bg-black/50 px-4 py-3 rounded-lg border border-white/5">{activeProblem.testCases?.[0]?.expected || "N/A"}</div></div>
+                        {/* DESCRIPTION / REQUIREMENTS AREA */}
+                        <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-[#FF4A1F] font-bold text-xs uppercase tracking-wider">
+                                <ListChecks size={14} /> Requirements
                             </div>
+                            <p className="text-gray-400 text-sm leading-relaxed whitespace-pre-wrap font-sans bg-[#141414] p-4 rounded-xl border border-white/5">
+                                {activeProblem.description}
+                            </p>
                         </div>
                     </div>
+                    {/* Sample Case (Only shows if test cases exist) */}
+                    {activeProblem.testCases?.[0] && (
+                        <div className="space-y-3">
+                            <div className="flex items-center gap-2"><Sparkles size={16} className="text-[#FF4A1F]"/><h3 className="text-sm font-bold text-white uppercase tracking-wider">Sample Case</h3></div>
+                            <div className="bg-[#1a1a1a] p-5 rounded-2xl border border-white/5 font-mono text-sm">
+                                <div className="space-y-4">
+                                    <div><div className="text-gray-500 text-xs mb-2 font-bold uppercase">Input</div><div className="text-white bg-black/50 px-4 py-3 rounded-lg border border-white/5">{activeProblem.testCases[0].input || "N/A"}</div></div>
+                                    <div><div className="text-gray-500 text-xs mb-2 font-bold uppercase">Expected Output</div><div className="text-[#FF4A1F] bg-black/50 px-4 py-3 rounded-lg border border-white/5">{activeProblem.testCases[0].expected || "N/A"}</div></div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
             {finalStatus && (
@@ -317,26 +400,83 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems, isEmbed
             )}
         </div>
 
-        {/* DRAGGER */}
         <div className="w-1 bg-[#1a1a1a] hover:bg-[#FF4A1F] cursor-col-resize transition-colors flex items-center justify-center z-50 hover:w-1.5 active:bg-[#FF4A1F]" onMouseDown={() => setIsDraggingSplit(true)}><GripVertical size={12} className="text-gray-600"/></div>
 
-        {/* RIGHT PANEL */}
+        {/* RIGHT PANEL (Editor + Output) */}
         <div ref={rightPanelRef} className="flex-1 flex flex-col bg-[#050505] min-w-[30%] relative">
             <div className="h-10 bg-[#0f0f0f] border-b border-white/5 flex items-center px-4 gap-3 select-none">
                 <FileCode size={14} className="text-gray-500"/>
-                <span className="text-xs text-gray-500 font-mono">{LANGUAGE_VERSIONS[language].file}</span>
+                <span className="text-xs text-gray-500 font-mono">{LANGUAGE_VERSIONS[language]?.file}</span>
             </div>
-            <textarea value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={handleKeyDown}  className="flex-1 w-full bg-[#050505] text-gray-300 font-mono text-sm p-6 outline-none resize-none leading-relaxed selection:bg-[#FF4A1F]/30" placeholder="// Write your solution here..." spellCheck="false" style={{ lineHeight: '1.6', tabSize: 4, pointerEvents: isDraggingSplit || isDraggingConsole ? 'none' : 'auto' }} />
+            
+            <textarea value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={handleKeyDown} onPaste={handlePaste} className="flex-1 w-full bg-[#050505] text-gray-300 font-mono text-sm p-6 outline-none resize-none leading-relaxed selection:bg-[#FF4A1F]/30" placeholder="// Write your solution here..." spellCheck="false" style={{ lineHeight: '1.6', tabSize: 4, pointerEvents: isDraggingSplit || isDraggingConsole ? 'none' : 'auto' }} />
+            
             <div className="h-1 bg-[#1a1a1a] hover:bg-[#FF4A1F] cursor-row-resize transition-colors z-50 hover:h-1.5 active:bg-[#FF4A1F]" onMouseDown={() => setIsDraggingConsole(true)}/>
+            
             <div className="bg-[#0f0f0f] border-t border-white/5 flex flex-col" style={{ height: `${consoleHeight}px` }}>
-                <div className="h-10 bg-[#141414] border-b border-white/5 flex items-center px-4 gap-3 select-none justify-between">
-                    <div className="flex items-center gap-2"><Terminal size={14} className="text-gray-500"/><span className="text-xs text-gray-500 uppercase font-bold tracking-wider">Console</span></div>
+                
+                {/* TABS */}
+                <div className="h-10 bg-[#141414] border-b border-white/5 flex items-center px-4 justify-between select-none">
+                    <div className="flex gap-4 h-full">
+                        <button 
+                            onClick={() => setViewMode("console")}
+                            className={`flex items-center gap-2 h-full border-b-2 px-2 text-xs font-bold uppercase tracking-wider transition-colors ${viewMode === "console" ? "border-[#FF4A1F] text-white" : "border-transparent text-gray-500 hover:text-gray-300"}`}
+                        >
+                            <Terminal size={14}/> Console
+                        </button>
+                        <button 
+                            onClick={() => setViewMode("browser")}
+                            className={`flex items-center gap-2 h-full border-b-2 px-2 text-xs font-bold uppercase tracking-wider transition-colors ${viewMode === "browser" ? "border-blue-500 text-blue-400" : "border-transparent text-gray-500 hover:text-gray-300"}`}
+                        >
+                            <Globe size={14}/> Live Preview
+                        </button>
+                    </div>
                     <button onClick={() => setConsoleHeight(40)} className="text-[10px] text-gray-600 hover:text-white uppercase font-bold">Minimize</button>
                 </div>
-                <div className="flex-1 p-4 overflow-y-auto font-mono text-xs scrollbar-thin scrollbar-thumb-white/10">
-                    {isRunning ? <div className="flex items-center gap-3 text-gray-400"><Cpu className="animate-spin" size={16}/><span>Executing...</span></div> : consoleOutput ? <div className="text-pink-400 whitespace-pre-wrap bg-pink-900/10 p-3 rounded-lg border border-pink-500/10">{consoleOutput}</div> : testResults.length > 0 ? (
-                        <div className="space-y-2">{testResults.map((res, i) => <div key={i} className={`p-3 rounded-lg border flex items-center justify-between ${res.passed ? 'bg-emerald-900/10 border-emerald-500/20 text-emerald-400' : 'bg-red-900/10 border-red-500/20 text-red-400'}`}><div className="flex flex-col"><span className="font-bold">Test Case #{res.caseIndex}</span>{!res.passed && <span className="text-[10px] opacity-70 mt-1">Expected: {res.expected} | Got: {res.actual || "(Empty)"}</span>}</div><span className="font-bold">{res.passed ? 'PASS' : 'FAIL'}</span></div>)}</div>
-                    ) : <div className="text-gray-600 flex items-center gap-2 mt-2"><Zap size={14}/><span>Run your code to see output here.</span></div>}
+
+                {/* CONTENT AREA */}
+                <div className="flex-1 overflow-hidden relative bg-[#0A0A0A]">
+                    {viewMode === "console" ? (
+                        <div className="p-4 h-full overflow-y-auto font-mono text-xs scrollbar-thin scrollbar-thumb-white/10">
+                            {isRunning ? (
+                                <div className="flex items-center gap-3 text-gray-400"><Cpu className="animate-spin" size={16}/><span>Executing...</span></div>
+                            ) : consoleOutput ? (
+                                <div className="text-pink-400 whitespace-pre-wrap bg-pink-900/10 p-3 rounded-lg border border-pink-500/10">{consoleOutput}</div>
+                            ) : testResults.length > 0 ? (
+                                <div className="space-y-2">
+                                    {testResults.map((res, i) => (
+                                        <div key={i} className={`p-3 rounded-lg border flex items-center justify-between ${res.passed ? 'bg-emerald-900/10 border-emerald-500/20 text-emerald-400' : 'bg-red-900/10 border-red-500/20 text-red-400'}`}>
+                                            <div className="flex flex-col">
+                                                <span className="font-bold">Test Case #{res.caseIndex}</span>
+                                                {!res.passed && <span className="text-[10px] opacity-70 mt-1">Expected: {res.expected} | Got: {res.actual || "(Empty)"}</span>}
+                                            </div>
+                                            <span className="font-bold">{res.passed ? 'PASS' : 'FAIL'}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-gray-600 flex items-center gap-2 mt-2"><Zap size={14}/><span>Run your code to see output here.</span></div>
+                            )}
+                        </div>
+                    ) : (
+                        // BROWSER PREVIEW
+                        <div className="w-full h-full bg-white relative">
+                            {htmlPreview ? (
+                                <iframe 
+                                    srcDoc={htmlPreview} 
+                                    title="Live Preview"
+                                    className="w-full h-full border-none"
+                                    sandbox="allow-scripts" 
+                                />
+                            ) : (
+                                <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                                    <Eye size={32} className="mb-2 opacity-50"/>
+                                    <p className="text-xs">No HTML output detected.</p>
+                                    <p className="text-[10px] opacity-50 mt-1">Try running code that outputs HTML.</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

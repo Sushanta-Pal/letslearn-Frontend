@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../supabaseClient';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
-  Loader2, ArrowLeft, Github, Plus, Clock, CheckCircle, 
-  AlertTriangle, Lock, ChevronDown, ChevronUp, Globe, X, Trophy, RefreshCw, Send 
+  Loader2, ArrowLeft, Github, Clock, CheckCircle, 
+  AlertTriangle, Lock, X, Trophy, RefreshCw, Send, Play 
 } from 'lucide-react';
 import TaskVerificationModal from './TaskVerificationModal';
+import CodingModule from '../CodingModule'; 
 
 const InternshipWorkspace = ({ user }) => {
   const { projectId } = useParams();
@@ -22,12 +23,10 @@ const InternshipWorkspace = ({ user }) => {
   const [repoStatus, setRepoStatus] = useState('idle'); 
 
   // UI State
-  const [verifyingTask, setVerifyingTask] = useState(null);
+  const [activeCodingTask, setActiveCodingTask] = useState(null); 
+  const [verifyingTask, setVerifyingTask] = useState(null); 
   const [viewingTaskRequirements, setViewingTaskRequirements] = useState(null); 
-  const [expandedTasks, setExpandedTasks] = useState({}); 
   const [showSubmitModal, setShowSubmitModal] = useState(false);
-  
-  // State for form
   const [submitForm, setSubmitForm] = useState({ repo: '', live: '' });
 
   useEffect(() => {
@@ -35,7 +34,7 @@ const InternshipWorkspace = ({ user }) => {
     handleGitHubFlow();
   }, [projectId]);
 
-  // --- 1. GITHUB LOGIC (Kept same as your working version) ---
+  // --- 1. GITHUB LOGIC ---
   const handleGitHubFlow = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.provider_token) {
@@ -110,11 +109,12 @@ const InternshipWorkspace = ({ user }) => {
 
   const fetchWorkspaceData = async () => {
     try {
+      console.log("Fetching Project ID:", projectId);
       const { data: proj, error: projError } = await supabase.from('internship_projects').select('*').eq('id', projectId).single();
       if (projError) throw projError;
 
       const { data: sub, error: subError } = await supabase.from('internship_submissions').select('*').eq('user_id', user.id).eq('project_id', projectId).single();
-
+      
       if (subError) {
         alert("Not enrolled in this internship.");
         navigate('/student/internships');
@@ -124,21 +124,50 @@ const InternshipWorkspace = ({ user }) => {
       setProject(proj);
       setSubmission(sub);
 
-      // (Your existing logic to check for stale board)
+      // --- INTELLIGENT SYNC CHECK ---
       let boardIsStale = false;
+      
+      // 1. Check if board is empty
       if (!sub.board_state || (!sub.board_state.todo.length && !sub.board_state.in_progress.length && !sub.board_state.done.length)) {
           boardIsStale = true; 
-      } else {
-          // Deep check if needed...
+      } 
+      // 2. Check for VERSION MISMATCH (Fix for your issue)
+      else if (proj.tasks && proj.tasks.length > 0) {
+          // Gather all IDs currently on the board
+          const currentBoardIds = new Set([
+              ...sub.board_state.todo.map(t => t.id),
+              ...sub.board_state.in_progress.map(t => t.id),
+              ...sub.board_state.done.map(t => t.id)
+          ]);
+
+          // Check if the Project's first task exists on the board
+          // If the project has "mod-task-1" but board has "web-task-1", this will trigger a reset
+          const firstProjectId = proj.tasks[0].id;
+          if (!currentBoardIds.has(firstProjectId)) {
+              console.log("⚠️ Version Mismatch Detected. Resetting Board...");
+              boardIsStale = true;
+          }
       }
 
+      console.log(">>> BOARD IS STALE?", boardIsStale);
+
       if (boardIsStale) {
-        const initialTasks = proj.tasks?.map((t, i) => {
+        const rawTasks = proj.tasks || [];
+        const initialTasks = rawTasks.map((t, i) => {
             const tId = t.id || `task-${i}`;
-            return { ...t, id: tId }; 
-        }) || [];
+            return { 
+                ...t, 
+                id: tId,
+                language: t.language || 'javascript' 
+            }; 
+        });
+
+        console.log(">>> INITIALIZING BOARD WITH:", initialTasks);
+        
         const newState = { todo: initialTasks, in_progress: [], done: [] };
         setTasks(newState);
+        
+        // Save the new structure immediately
         saveBoardState(newState, sub.id);
       } else {
         setTasks(sub.board_state);
@@ -149,7 +178,6 @@ const InternshipWorkspace = ({ user }) => {
       setLoading(false);
     }
   };
-
   const performMove = async (task, sourceCol, targetCol) => {
     const newTasks = {
       ...tasks,
@@ -170,15 +198,39 @@ const InternshipWorkspace = ({ user }) => {
     if (!taskToMove) return;
 
     if (targetCol === 'done') {
-      setVerifyingTask({ task: taskToMove, sourceCol }); 
+      alert("Please open the task and click 'Submit' to verify your code before moving to Done.");
       return; 
     }
     performMove(taskToMove, sourceCol, targetCol);
   };
 
+  // --- 3. CODING FLOW HANDLERS ---
+  
+  const handleTaskClick = (task, col) => {
+      // DEBUG: Check what data is passed to editor
+      console.log(">>> OPENING CODING MODULE WITH TASK:", task);
+      
+      if (col === 'todo') return setViewingTaskRequirements(task);
+      if (col === 'in_progress') return setActiveCodingTask(task); 
+      if (col === 'done') return alert("Task already completed!");
+  };
+
+  const handleCodingComplete = (score, code, language) => {
+      const task = activeCodingTask;
+      setActiveCodingTask(null);
+
+      setVerifyingTask({
+          task: task,
+          code: code,
+          language: language,
+          sourceCol: 'in_progress'
+      });
+  };
+
   const handleVerificationSuccess = async (xpReward) => {
     if (!verifyingTask) return;
     const { task, sourceCol } = verifyingTask;
+    
     await performMove(task, sourceCol, 'done');
     await supabase.rpc('add_xp_and_check_rank', { p_user_id: user.id, p_xp_amount: xpReward || 100 });
     
@@ -190,8 +242,6 @@ const InternshipWorkspace = ({ user }) => {
     if (tasks.todo.length > 0 || tasks.in_progress.length > 0) {
       return alert("You must complete ALL tasks (move to 'Done') before submitting.");
     }
-    
-    // Auto-fill GitHub URL
     const { data: { session } } = await supabase.auth.getSession();
     const username = session?.user?.user_metadata?.user_name;
     if (username) {
@@ -203,28 +253,23 @@ const InternshipWorkspace = ({ user }) => {
     setShowSubmitModal(true);
   };
 
-  // --- UPDATED SUBMIT LOGIC (Wait for Review) ---
   const submitProject = async () => {
     const { repo, live } = submitForm;
     if (!repo || !repo.includes("github.com")) return alert("Invalid GitHub URL.");
 
-    if (!confirm("Submit project for mentor review? You won't be able to edit it while it's under review.")) return;
+    if (!confirm("Submit project for mentor review?")) return;
 
     setLoading(true);
     try {
         const { error: updateError } = await supabase.from('internship_submissions').update({ 
             repo_link: repo,
             live_link: live || null,
-            status: 'pending_review', // <--- CHANGED: No longer 'completed'
+            status: 'pending_review',
             submitted_at: new Date()
         }).eq('id', submission.id);
 
         if (updateError) throw updateError;
-
-        // NOTE: We DO NOT call complete_internship here anymore. 
-        // The Teacher does that in the Review Dashboard.
-
-        alert("Project Submitted for Review! \n\nYour mentor will verify your code. Once approved, your certificate will be generated.");
+        alert("Project Submitted for Review!");
         navigate('/student/internships'); 
 
     } catch(err) {
@@ -233,11 +278,6 @@ const InternshipWorkspace = ({ user }) => {
     } finally {
         setLoading(false);
     }
-  };
-
-  const toggleTaskExpand = (e, taskId) => {
-    e.stopPropagation();
-    setExpandedTasks(prev => ({ ...prev, [taskId]: !prev[taskId] }));
   };
 
   if (loading) return <div className="h-screen flex items-center justify-center bg-black text-white"><Loader2 className="animate-spin text-indigo-500" size={40}/></div>;
@@ -273,7 +313,6 @@ const InternshipWorkspace = ({ user }) => {
                 </button>
             )}
 
-            {/* --- STATUS AWARE SUBMIT BUTTON --- */}
             {submission?.status === 'pending_review' ? (
                 <div className="flex items-center gap-2 px-4 py-2 bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 rounded-lg text-sm font-bold animate-pulse">
                     <Clock size={16}/> Under Review
@@ -283,23 +322,9 @@ const InternshipWorkspace = ({ user }) => {
                     <Trophy size={16}/> Certified
                 </div>
             ) : (
-                <div className="flex gap-2 items-center">
-                    {/* SHOW REJECTION FEEDBACK IF EXISTS */}
-                    {submission?.admin_feedback && (
-                        <div className="group relative">
-                            <div className="flex items-center gap-2 px-3 py-2 bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg text-xs cursor-help">
-                                <AlertTriangle size={14}/> Action Required
-                            </div>
-                            <div className="absolute top-10 right-0 w-64 p-4 bg-[#111] border border-red-500/50 rounded-xl shadow-xl z-50 hidden group-hover:block">
-                                <p className="text-xs font-bold text-red-400 mb-1">Mentor Feedback:</p>
-                                <p className="text-xs text-gray-300">{submission.admin_feedback}</p>
-                            </div>
-                        </div>
-                    )}
-                    <button onClick={handleOpenSubmitModal} className="flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-bold shadow-lg shadow-indigo-500/20">
-                        {submission?.admin_feedback ? "Resubmit Project" : "Submit Project"}
-                    </button>
-                </div>
+                <button onClick={handleOpenSubmitModal} className="flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-bold shadow-lg shadow-indigo-500/20">
+                    {submission?.admin_feedback ? "Resubmit Project" : "Submit Project"}
+                </button>
             )}
         </div>
       </header>
@@ -309,7 +334,6 @@ const InternshipWorkspace = ({ user }) => {
         <div className="max-w-7xl mx-auto">
             <MilestoneJourney progress={progressPercent} />
             <div className="flex gap-6 h-[600px] overflow-x-auto pb-4">
-                {/* Kanban Columns (Same as before) */}
                 {['todo', 'in_progress', 'done'].map(col => (
                     <div key={col} onDragOver={(e) => e.preventDefault()} onDrop={(e) => handleDrop(e, col)} className={`flex-1 min-w-[300px] rounded-2xl border flex flex-col transition-colors ${col === 'done' ? 'bg-[#111] border-green-900/30' : 'bg-[#111] border-gray-800'}`}>
                         <div className="p-4 border-b border-gray-800 flex justify-between items-center bg-[#161616] rounded-t-2xl">
@@ -323,14 +347,24 @@ const InternshipWorkspace = ({ user }) => {
                         </div>
                         <div className="p-4 space-y-3 overflow-y-auto flex-1 custom-scrollbar">
                             {tasks[col].map((task) => (
-                                <div key={task.id} draggable={col !== 'done' && submission.status !== 'pending_review'} onDragStart={(e) => {
-                                    if (col === 'done' || submission.status === 'pending_review') { e.preventDefault(); return; }
-                                    e.dataTransfer.setData("taskId", task.id); 
-                                    e.dataTransfer.setData("sourceCol", col);
-                                }} onClick={() => col === 'in_progress' ? setViewingTaskRequirements(task) : null} className={`bg-[#1A1A1A] p-4 rounded-xl border border-gray-700 relative group ${col !== 'done' && submission.status !== 'pending_review' ? 'cursor-grab hover:border-indigo-500' : 'cursor-default opacity-80'}`}>
+                                <div 
+                                    key={task.id} 
+                                    draggable={col !== 'done' && submission.status !== 'pending_review'} 
+                                    onDragStart={(e) => {
+                                        if (col === 'done' || submission.status === 'pending_review') { e.preventDefault(); return; }
+                                        e.dataTransfer.setData("taskId", task.id); 
+                                        e.dataTransfer.setData("sourceCol", col);
+                                    }} 
+                                    onClick={() => handleTaskClick(task, col)} 
+                                    className={`bg-[#1A1A1A] p-4 rounded-xl border border-gray-700 relative group transition-all hover:-translate-y-1 ${col !== 'done' && submission.status !== 'pending_review' ? 'cursor-pointer hover:border-indigo-500' : 'cursor-default opacity-80'}`}
+                                >
                                     <div className="flex justify-between items-start"><p className="text-sm font-medium mb-1 text-gray-200">{task.title}</p></div>
-                                    {/* Task Card Content (Same as before) */}
-                                    {task.requirements && <div className="text-[10px] text-gray-500 mt-2 bg-black/30 p-2 rounded border border-white/5"><span className="line-clamp-2">{task.requirements}</span></div>}
+                                    {col === 'in_progress' && (
+                                        <div className="mt-3 flex items-center gap-2 text-xs text-indigo-400 font-bold">
+                                            <Play size={12} className="fill-indigo-400"/> Click to Code
+                                        </div>
+                                    )}
+                                    {col === 'todo' && task.requirements && <div className="text-[10px] text-gray-500 mt-2 line-clamp-2">{task.requirements}</div>}
                                 </div>
                             ))}
                         </div>
@@ -340,7 +374,39 @@ const InternshipWorkspace = ({ user }) => {
         </div>
       </div>
 
-      {/* --- MODALS (Same as before, View Requirements, Verification, Submit) --- */}
+      {activeCodingTask && (
+         <div className="fixed inset-0 bg-black z-[100] animate-in slide-in-from-bottom-10">
+            <div className="h-full flex flex-col">
+               <div className="h-14 border-b border-gray-800 flex items-center justify-between px-6 bg-[#111]">
+                   <h2 className="text-white font-bold flex items-center gap-2"><Play size={16} className="text-indigo-500"/> Coding: {activeCodingTask.title}</h2>
+                   <button onClick={() => setActiveCodingTask(null)} className="text-gray-400 hover:text-white flex items-center gap-2 text-sm font-bold bg-white/10 px-3 py-1.5 rounded-lg"><X size={16}/> Exit Workspace</button>
+               </div>
+               <div className="flex-1 overflow-hidden">
+                   <CodingModule 
+                        user={user}
+                        sessionId={submission.id}
+                        isEmbedded={true}
+                        problems={[activeCodingTask]} 
+                        onComplete={handleCodingComplete}
+                        onCancel={() => setActiveCodingTask(null)}
+                   />
+               </div>
+            </div>
+         </div>
+      )}
+
+      {verifyingTask && (
+        <TaskVerificationModal 
+           task={verifyingTask.task}
+           code={verifyingTask.code}      
+           language={verifyingTask.language} 
+           project={project}
+           user={user}
+           onClose={() => setVerifyingTask(null)}
+           onSuccess={handleVerificationSuccess}
+        />
+      )}
+
       {viewingTaskRequirements && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
              <div className="bg-[#111] border border-gray-800 rounded-xl max-w-md w-full p-6 shadow-2xl animate-in zoom-in-95">
@@ -350,20 +416,11 @@ const InternshipWorkspace = ({ user }) => {
                  </div>
                  <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-800 mb-6">
                      <p className="text-xs text-indigo-400 font-bold uppercase mb-2 flex items-center gap-2"><Lock size={12}/> Task Requirements</p>
-                     <p className="text-sm text-gray-300 font-mono leading-relaxed">{viewingTaskRequirements.requirements}</p>
+                     <p className="text-sm text-gray-300 font-mono leading-relaxed whitespace-pre-wrap">{viewingTaskRequirements.requirements}</p>
                  </div>
                  <button onClick={() => setViewingTaskRequirements(null)} className="w-full bg-white text-black font-bold py-3 rounded-lg hover:bg-gray-200">Close</button>
              </div>
         </div>
-      )}
-
-      {verifyingTask && (
-        <TaskVerificationModal 
-           task={verifyingTask.task}
-           projectTitle={project?.title || "Internship_Project"} 
-           onClose={() => setVerifyingTask(null)}
-           onSuccess={handleVerificationSuccess}
-        />
       )}
 
       {showSubmitModal && (
@@ -388,11 +445,10 @@ const InternshipWorkspace = ({ user }) => {
   );
 };
 
-// ... (MilestoneJourney and MilestonePoint remain the same) ...
 const MilestoneJourney = ({ progress }) => {
     return (
       <div className="bg-[#111] p-6 rounded-2xl border border-gray-800 mb-8 relative overflow-hidden">
-         <div className="flex justify-between items-center mb-8 relative z-10">
+          <div className="flex justify-between items-center mb-8 relative z-10">
             <div>
                <h3 className="text-xl font-bold text-white flex items-center gap-2">Internship Trajectory <Trophy size={16} className="text-yellow-500"/></h3>
                <p className="text-sm text-gray-500">Milestone based progress tracking</p>
@@ -401,30 +457,30 @@ const MilestoneJourney = ({ progress }) => {
                <span className="text-3xl font-black text-indigo-500">{progress}%</span>
                <p className="text-xs text-gray-400 uppercase tracking-widest">Completion</p>
             </div>
-         </div>
+          </div>
   
-         <div className="relative h-32 w-full">
-            <div className="absolute inset-0 grid grid-cols-4 gap-4 opacity-10">
-               <div className="border-r border-white/20"></div>
-               <div className="border-r border-white/20"></div>
-               <div className="border-r border-white/20"></div>
-            </div>
+          <div className="relative h-32 w-full">
+             <div className="absolute inset-0 grid grid-cols-4 gap-4 opacity-10">
+                <div className="border-r border-white/20"></div>
+                <div className="border-r border-white/20"></div>
+                <div className="border-r border-white/20"></div>
+             </div>
   
-            <MilestonePoint percent={10} label="Onboard" current={progress} left="10%" bottom="10%" />
-            <MilestonePoint percent={50} label="Mid-Term" current={progress} left="50%" bottom="40%" />
-            <MilestonePoint percent={100} label="Launch" current={progress} left="90%" bottom="80%" />
+             <MilestonePoint percent={10} label="Onboard" current={progress} left="10%" bottom="10%" />
+             <MilestonePoint percent={50} label="Mid-Term" current={progress} left="50%" bottom="40%" />
+             <MilestonePoint percent={100} label="Launch" current={progress} left="90%" bottom="80%" />
   
-            <svg className="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none">
-               <path 
-                 d="M 50 120 C 200 120, 500 80, 1000 20" 
-                 fill="none" 
-                 stroke={progress > 0 ? "#6366f1" : "#334155"} 
-                 strokeWidth="3" 
-                 strokeLinecap="round"
-                 strokeDasharray="6,6"
-               />
-            </svg>
-         </div>
+             <svg className="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none">
+                <path 
+                  d="M 50 120 C 200 120, 500 80, 1000 20" 
+                  fill="none" 
+                  stroke={progress > 0 ? "#6366f1" : "#334155"} 
+                  strokeWidth="3" 
+                  strokeLinecap="round"
+                  strokeDasharray="6,6"
+                />
+             </svg>
+          </div>
       </div>
     );
 };

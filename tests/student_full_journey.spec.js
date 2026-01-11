@@ -1,0 +1,52 @@
+import { test, expect } from '@playwright/test';
+
+test('test', async ({ page }) => {
+  await page.goto('http://localhost:5173/');
+  await page.locator('section').filter({ hasText: 'Now hiring for Virtual' }).click();
+  await page.getByRole('link', { name: 'Login' }).click();
+  await page.getByRole('textbox', { name: 'name@example.com' }).click();
+  await page.getByRole('textbox', { name: 'name@example.com' }).click();
+  await page.getByRole('textbox', { name: 'name@example.com' }).fill('sp0071331@gmail.com');
+  await page.getByRole('textbox', { name: '••••••••' }).click();
+  await page.getByRole('textbox', { name: '••••••••' }).fill('Sushanta#1');
+  await page.getByRole('button', { name: 'Sign In as student' }).click();
+  await page.getByRole('link', { name: 'My Courses Continue your' }).click();
+  await page.getByRole('heading', { name: 'Programming & Data Structures' }).click();
+  await page.getByRole('button', { name: 'Watch' }).click();
+  await page.getByRole('button', { name: 'Quiz', exact: true }).click();
+  await page.getByText('BackProgramming & Data').click();
+  await page.getByRole('button', { name: 'Back' }).click();
+  await page.getByRole('link', { name: 'Overview' }).click();
+  await page.getByRole('link', { name: 'Internships' }).click();
+  await page.getByRole('link', { name: 'Internships' }).click();
+  await page.getByRole('link', { name: 'Internships', exact: true }).click();
+  await page.getByRole('button', { name: 'Accept Offer' }).click();
+  await page.getByRole('main').getByRole('button').filter({ hasText: /^$/ }).click();
+  await page.getByText('FFrontend EngineerFoxBird Creators In ProgressEnter Workspace').click();
+  await page.getByText('Click to Code').first().click();
+  await page.locator('div').filter({ hasText: /^Enter Workspace$/ }).first().click();
+  await page.getByText('Click to Code').first().click();
+  await page.getByRole('link', { name: 'Assignments' }).click();
+  await page.getByRole('textbox', { name: 'ENTER CODE' }).click();
+  await page.getByRole('textbox', { name: 'ENTER CODE' }).fill('1437');
+  page.once('dialog', dialog => {
+    console.log(`Dialog message: ${dialog.message()}`);
+    dialog.dismiss().catch(() => {});
+  });
+  await page.getByRole('button', { name: 'Start Assignment' }).click();
+  await page.getByRole('link', { name: 'Practice' }).click();
+  await page.getByRole('link', { name: 'Mock Interview' }).click();
+  await page.getByRole('textbox', { name: 'ENTER-CODE' }).click();
+  await page.getByRole('textbox', { name: 'ENTER-CODE' }).fill('1437');
+  await page.getByRole('textbox', { name: 'ENTER-CODE' }).press('Enter');
+  await page.getByRole('button', { name: 'GO' }).click();
+  await page.getByRole('heading', { name: 'Communication' }).click();
+  await page.getByRole('main').getByRole('button').filter({ hasText: /^$/ }).click();
+  page.once('dialog', dialog => {
+    console.log(`Dialog message: ${dialog.message()}`);
+    dialog.dismiss().catch(() => {});
+  });
+  await page.getByRole('button', { name: 'Terminate Session' }).click();
+  await page.getByRole('link', { name: 'Practice' }).click();
+  await page.getByRole('link', { name: 'Overview' }).click();
+});
