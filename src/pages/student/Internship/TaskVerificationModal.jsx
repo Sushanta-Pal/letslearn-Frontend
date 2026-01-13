@@ -51,7 +51,7 @@ export default function TaskVerificationModal({ task, code, language, projectTit
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
                       taskTitle: task.title,
-                      taskDescription: task.requirements,
+                      taskDescription: task.requirements || task.description,
                       studentCode: code
                   })
               });
