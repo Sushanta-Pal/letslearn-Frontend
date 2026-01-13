@@ -409,7 +409,7 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems, isEmbed
                 <span className="text-xs text-gray-500 font-mono">{LANGUAGE_VERSIONS[language]?.file}</span>
             </div>
             
-            <textarea value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={handleKeyDown} onPaste={handlePaste} className="flex-1 w-full bg-[#050505] text-gray-300 font-mono text-sm p-6 outline-none resize-none leading-relaxed selection:bg-[#FF4A1F]/30" placeholder="// Write your solution here..." spellCheck="false" style={{ lineHeight: '1.6', tabSize: 4, pointerEvents: isDraggingSplit || isDraggingConsole ? 'none' : 'auto' }} />
+            <textarea value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={handleKeyDown}  className="flex-1 w-full bg-[#050505] text-gray-300 font-mono text-sm p-6 outline-none resize-none leading-relaxed selection:bg-[#FF4A1F]/30" placeholder="// Write your solution here..." spellCheck="false" style={{ lineHeight: '1.6', tabSize: 4, pointerEvents: isDraggingSplit || isDraggingConsole ? 'none' : 'auto' }} />
             
             <div className="h-1 bg-[#1a1a1a] hover:bg-[#FF4A1F] cursor-row-resize transition-colors z-50 hover:h-1.5 active:bg-[#FF4A1F]" onMouseDown={() => setIsDraggingConsole(true)}/>
             
