@@ -3,8 +3,7 @@ import { supabase } from '../../../supabaseClient';
 import { Loader2, GitCommit, X, ShieldCheck, AlertTriangle, CheckCircle, Github, ArrowRight, XCircle } from 'lucide-react';
 
 export default function TaskVerificationModal({ task, code, language, projectTitle, user, onClose, onSuccess }) {
-  // States for the UI Pipeline
-  const [status, setStatus] = useState('analyzing'); // analyzing | verifying | uploading | success | error
+  const [status, setStatus] = useState('analyzing'); 
   const [logs, setLogs] = useState([]);
   const [feedback, setFeedback] = useState(null);
   const [githubUrl, setGithubUrl] = useState(null);
@@ -15,24 +14,17 @@ export default function TaskVerificationModal({ task, code, language, projectTit
 
   const addLog = (msg) => setLogs(prev => [...prev, `> ${msg}`]);
 
-  // --- 1. PATH PARSER (Critical for Portfolio) ---
   const getFilePath = () => {
-    // If title has a path like "2. Styles: css/global.css", extract it
     if (task.title && task.title.includes(":")) {
         return task.title.split(":")[1].trim(); 
     }
-    
-    // Fallback: Clean string
     const safeProject = (projectTitle || "Internship_Project").replace(/[^a-zA-Z0-9]/g, '_');
     const safeTask = (task.title || `task-${task.id}`).replace(/[^a-zA-Z0-9-_]/g, '_');
-    
     const extMap = { 'python': 'py', 'java': 'java', 'cpp': 'cpp', 'javascript': 'js', 'html': 'html', 'css': 'css' };
     const ext = extMap[language] || language || 'txt';
-    
     return `${safeProject}/${safeTask}.${ext}`;
   };
 
-  // --- 2. CORE PIPELINE ---
   const runPipeline = async () => {
     try {
       // STEP 1: AI QUALITY CHECK
@@ -42,7 +34,6 @@ export default function TaskVerificationModal({ task, code, language, projectTit
       let aiPassed = true;
       let aiFeedbackMsg = "Code looks good.";
 
-      // TRY CALLING REAL AI
       try {
           const API_URL = import.meta.env.VITE_MOTIA_URL; 
           if (API_URL) {
@@ -51,7 +42,8 @@ export default function TaskVerificationModal({ task, code, language, projectTit
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
                       taskTitle: task.title,
-                      taskDescription: task.requirements || task.description,
+                      // Fallback to description if requirements is missing
+                      taskDescription: task.requirements || task.description || "Implement functional logic.",
                       studentCode: code
                   })
               });
@@ -63,26 +55,21 @@ export default function TaskVerificationModal({ task, code, language, projectTit
                   addLog(`AI Approved! (+${verifyData.xp || 100} XP)`);
               }
           } else {
-              // MOCK AI (If env var missing)
               await new Promise(r => setTimeout(r, 1500)); 
               addLog("AI Verification Simulation: Passed.");
           }
       } catch (err) {
-          console.warn("AI Service Unavailable, skipping check.", err);
+          console.warn("AI Service Unavailable", err);
           addLog("⚠️ AI Service offline. Skipping semantic check.");
       }
 
-      if (!aiPassed) {
-          throw new Error(aiFeedbackMsg);
-      }
-      
+      if (!aiPassed) throw new Error(aiFeedbackMsg);
       addLog("Code quality verified.");
 
       // STEP 2: GITHUB SYNC
       setStatus('uploading');
       addLog("Connecting to GitHub...");
 
-      // Get Token
       const { data: { session } } = await supabase.auth.getSession();
       const providerToken = session?.provider_token;
       if (!providerToken) throw new Error("GitHub Token Missing. Please reconnect GitHub.");
@@ -95,11 +82,13 @@ export default function TaskVerificationModal({ task, code, language, projectTit
       const filePath = getFilePath();
       addLog(`Target: ${repoName}/${filePath}`);
 
-      // Prepare Commit
       const message = `feat: Completed ${task.title}`;
-      const contentEncoded = btoa(code); 
+      
+      // --- THE FIX IS HERE ---
+      // We use encodeURIComponent to turn Unicode into UTF-8 bytes, 
+      // then unescape to make it a binary string that btoa accepts.
+      const contentEncoded = btoa(unescape(encodeURIComponent(code))); 
 
-      // Get SHA (for update)
       let sha = null;
       try {
         const checkRes = await fetch(`https://api.github.com/repos/${username}/${repoName}/contents/${filePath}`, {
@@ -112,7 +101,6 @@ export default function TaskVerificationModal({ task, code, language, projectTit
         }
       } catch (e) {}
 
-      // Push File
       const commitRes = await fetch(`https://api.github.com/repos/${username}/${repoName}/contents/${filePath}`, {
           method: 'PUT',
           headers: { 
@@ -128,10 +116,7 @@ export default function TaskVerificationModal({ task, code, language, projectTit
       setGithubUrl(commitData.content?.html_url || `https://github.com/${username}/${repoName}`);
       addLog("Successfully pushed to main branch.");
 
-      // STEP 3: SUCCESS
       setStatus('success');
-      // Tell Parent Component we are done
-      // We wait for user to click "Continue" to trigger onSuccess
       
     } catch (err) {
       console.error(err);
@@ -144,7 +129,6 @@ export default function TaskVerificationModal({ task, code, language, projectTit
     <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[100] p-4">
       <div className="bg-[#0A0A0A] w-full max-w-lg rounded-2xl border border-white/10 shadow-2xl overflow-hidden relative animate-in zoom-in-95">
         
-        {/* HEADER */}
         <div className="p-6 border-b border-white/10 flex justify-between items-center bg-[#111]">
             <h3 className="font-bold text-white flex items-center gap-2">
                 <ShieldCheck className={status === 'error' ? "text-red-500" : "text-emerald-500"}/> 
@@ -153,7 +137,6 @@ export default function TaskVerificationModal({ task, code, language, projectTit
             <button onClick={onClose}><X size={20} className="text-gray-500 hover:text-white"/></button>
         </div>
 
-        {/* STATUS VISUALIZER */}
         <div className="p-8 text-center border-b border-white/5">
              {status === 'analyzing' && (
                  <>
@@ -193,14 +176,12 @@ export default function TaskVerificationModal({ task, code, language, projectTit
              )}
         </div>
 
-        {/* TERMINAL LOGS */}
         <div className="p-4 bg-black font-mono text-[10px] h-32 overflow-y-auto space-y-1 scrollbar-thin scrollbar-thumb-white/10">
             {logs.map((log, i) => (
                 <div key={i} className="text-gray-500 truncate">{log}</div>
             ))}
         </div>
 
-        {/* FOOTER ACTIONS */}
         <div className="p-6 bg-[#111] border-t border-white/10">
             {status === 'error' ? (
                 <button onClick={onClose} className="w-full py-3 bg-white text-black font-bold rounded-xl hover:bg-gray-200">
