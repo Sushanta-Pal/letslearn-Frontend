@@ -181,20 +181,29 @@ const executeCode = async (codeToRun, inputData) => {
     const languageId = langMap[language] || 62;
     const safeInput = (inputData !== undefined && inputData !== null) ? String(inputData) : "";
 
-    // 1. Helpers to safely Base64 encode/decode strings in React to bypass API firewalls
+    // Load the API key from the .env file (supports both Vite and Create React App)
+    const apiKey = import.meta.env?.VITE_RAPIDAPI_KEY || process.env?.REACT_APP_RAPIDAPI_KEY;
+
+    if (!apiKey) {
+        console.error("Missing API Key. Please check your .env file and restart the server.");
+        return { 
+            compile: { code: 0 }, 
+            run: { stderr: "SYSTEM ERROR:\nAPI Key is missing from environment variables." } 
+        };
+    }
+
+    // Helpers to safely Base64 encode/decode strings to bypass API firewalls
     const encodeBase64 = (str) => btoa(unescape(encodeURIComponent(str || "")));
     const decodeBase64 = (str) => str ? decodeURIComponent(escape(atob(str))) : "";
 
     try {
-        // 2. We change the URL to base64_encoded=true
         const response = await fetch("https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=true&wait=true", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
                 "x-rapidapi-host": "judge0-ce.p.rapidapi.com",
-                "x-rapidapi-key": "c66399fefcmsh632810f1a78c9f9p17c06djsncca6c6f55485" 
+                "x-rapidapi-key": apiKey 
             },
-            // 3. We encode the payload before sending
             body: JSON.stringify({
                 source_code: encodeBase64(codeToRun),
                 language_id: languageId,
@@ -202,7 +211,6 @@ const executeCode = async (codeToRun, inputData) => {
             }),
         });
 
-        // 4. If it fails, we catch the EXACT error text from the server
         if (!response.ok) {
             const errorDetails = await response.text();
             throw new Error(`API Error ${response.status}: ${errorDetails}`);
@@ -210,7 +218,6 @@ const executeCode = async (codeToRun, inputData) => {
 
         const result = await response.json();
 
-        // 5. We decode the base64 response back into readable text for your UI
         return {
             compile: { 
                 code: result.compile_output ? 1 : 0,
