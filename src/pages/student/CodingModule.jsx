@@ -176,24 +176,58 @@ const CodingModule = ({ user, sessionId, onComplete, onCancel, problems, isEmbed
     return "";
   };
 
-  const executeCode = async (codeToRun, inputData) => {
-    const config = LANGUAGE_VERSIONS[language] || LANGUAGE_VERSIONS.java;
+const executeCode = async (codeToRun, inputData) => {
+    const langMap = { java: 62, python: 71, cpp: 54, javascript: 63 };
+    const languageId = langMap[language] || 62;
+    const safeInput = (inputData !== undefined && inputData !== null) ? String(inputData) : "";
+
+    // 1. Helpers to safely Base64 encode/decode strings in React to bypass API firewalls
+    const encodeBase64 = (str) => btoa(unescape(encodeURIComponent(str || "")));
+    const decodeBase64 = (str) => str ? decodeURIComponent(escape(atob(str))) : "";
+
     try {
-      const safeInput = (inputData !== undefined && inputData !== null) ? String(inputData) : "";
-      
-      const response = await fetch("https://emkc.org/api/v2/piston/execute", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          language: config.language,
-          version: config.version,
-          files: [{ name: config.file, content: codeToRun }],
-          stdin: safeInput,
-        }),
-      });
-      return await response.json();
+        // 2. We change the URL to base64_encoded=true
+        const response = await fetch("https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=true&wait=true", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "x-rapidapi-host": "judge0-ce.p.rapidapi.com",
+                "x-rapidapi-key": "c66399fefcmsh632810f1a78c9f9p17c06djsncca6c6f55485" 
+            },
+            // 3. We encode the payload before sending
+            body: JSON.stringify({
+                source_code: encodeBase64(codeToRun),
+                language_id: languageId,
+                stdin: encodeBase64(safeInput)
+            }),
+        });
+
+        // 4. If it fails, we catch the EXACT error text from the server
+        if (!response.ok) {
+            const errorDetails = await response.text();
+            throw new Error(`API Error ${response.status}: ${errorDetails}`);
+        }
+
+        const result = await response.json();
+
+        // 5. We decode the base64 response back into readable text for your UI
+        return {
+            compile: { 
+                code: result.compile_output ? 1 : 0,
+                stderr: decodeBase64(result.compile_output) 
+            },
+            run: {
+                stdout: decodeBase64(result.stdout),
+                stderr: decodeBase64(result.stderr) || (result.status?.id !== 3 ? result.status?.description : "")
+            }
+        };
+
     } catch (err) {
-      return null;
+        console.error("Execution error:", err);
+        return { 
+            compile: { code: 0 }, 
+            run: { stderr: `SYSTEM ERROR:\n${err.message}` } 
+        };
     }
   };
 
