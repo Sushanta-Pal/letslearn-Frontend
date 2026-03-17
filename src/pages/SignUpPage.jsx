@@ -44,7 +44,7 @@ export default function SignUpPage() {
           data: {
             full_name: fullName,
             role: role,
-            verified: isVerified, // <--- NEW FIELD
+            verified: isVerified,
           },
         },
       });
@@ -66,45 +66,51 @@ export default function SignUpPage() {
     }
   };
 
-  // ... (Rest of the JSX remains exactly the same as your previous version)
   return (
-    <div className="min-h-screen w-full bg-[#060606] text-white flex relative overflow-hidden">
-      {/* ... Left Panel ... */}
-      <div className="hidden lg:flex flex-col justify-between p-14 w-2/5">
-        <div>
-          <h1 className="text-xl font-bold">Fox Bird</h1>
-          <h2 className="mt-14 text-4xl font-extrabold">
+    <div className="min-h-screen w-full bg-[#060606] text-white flex flex-col lg:flex-row overflow-y-auto">
+      
+      {/* --- Left Panel --- */}
+      <div className="hidden lg:flex flex-col justify-between p-12 lg:p-16 w-full lg:w-5/12 bg-[#060606]">
+        <div className="sticky top-16">
+          <h1 className="text-xl font-bold tracking-wide">Fox Bird</h1>
+          <h2 className="mt-14 text-4xl lg:text-5xl font-extrabold leading-tight">
             Welcome to the future of
-            <div className="text-6xl mt-2">
+            <div className="text-5xl lg:text-6xl mt-4">
               <RotatingText
                 texts={["Creativity", "Innovation", "Tech", "Engineering"]}
-                mainClassName="px-3 bg-orange-500 rounded-lg"
+                mainClassName="px-3 bg-[#FF4A1F] rounded-lg inline-block text-white"
                 rotationInterval={2000}
               />
             </div>
           </h2>
-          <p className="mt-6 text-gray-400 max-w-md">
+          <p className="mt-6 text-gray-400 max-w-md text-lg">
             Learn, build, and grow with real-world projects and guided learning.
           </p>
         </div>
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-gray-600 mt-12">
           © 2025 Fox Bird — All rights reserved.
         </p>
       </div>
 
-      {/* ... Right Panel ... */}
-      <div className="w-full lg:w-3/5 flex items-center justify-center p-10">
-        <div className="w-full max-w-md bg-[#0C0C0C] border border-gray-800 rounded-2xl p-8">
-          <h2 className="text-3xl font-bold">Create your account</h2>
-          <p className="text-gray-400 mt-1">
+      {/* --- Right Panel --- */}
+      <div className="w-full lg:w-7/12 flex items-center justify-center p-4 sm:p-8 lg:p-12 min-h-screen lg:min-h-0">
+        <div className="w-full max-w-lg bg-[#0C0C0C] border border-gray-800 rounded-2xl p-6 sm:p-10 shadow-2xl">
+          
+          {/* Mobile Header (Hidden on Desktop) */}
+          <div className="lg:hidden mb-8 flex justify-center">
+             <h1 className="text-2xl font-bold tracking-wide text-white">Fox Bird</h1>
+          </div>
+
+          <h2 className="text-3xl font-bold text-white">Create your account</h2>
+          <p className="text-gray-400 mt-2">
             Already have an account?{" "}
-            <a href="/login" className="text-[#FF4A1F] font-semibold">
+            <a href="/login" className="text-[#FF4A1F] font-semibold hover:underline transition-all">
               Login
             </a>
           </p>
 
-          <div className="mt-6">
-            <p className="text-xs text-gray-500 mb-2 uppercase">
+          <div className="mt-8">
+            <p className="text-xs text-gray-500 mb-3 font-semibold uppercase tracking-wider">
               Choose your panel
             </p>
             <RolePanelSelector value={role} onChange={setRole} />
@@ -124,7 +130,7 @@ export default function SignUpPage() {
               onChange={(e) => setEmail(e.target.value)}
             />
 
-            <div>
+            <div className="space-y-1">
               <Input
                 label="Password"
                 type="password"
@@ -143,58 +149,47 @@ export default function SignUpPage() {
 
             <button
               disabled={loading}
-              className="w-full py-3 bg-[#FF4A1F] text-black font-semibold rounded-xl"
+              className="w-full py-3.5 mt-4 bg-[#FF4A1F] hover:bg-[#e03e15] text-white font-bold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? "Creating Account..." : "Create Account"}
             </button>
           </form>
-
-          <Divider />
-          <OAuthButton label="Continue with Google" icon="https://www.svgrepo.com/show/475656/google-color.svg" provider="google" />
-          <OAuthButton label="Continue with GitHub" icon="https://www.svgrepo.com/show/343674/github.svg" provider="github" />
         </div>
       </div>
     </div>
   );
 }
 
-/* ---------------- COMPONENTS (Keep existing) ---------------- */
+/* ---------------- COMPONENTS ---------------- */
+
 function Input({ label, type = "text", placeholder, onChange }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-sm text-gray-300">{label}</label>
-      <input type={type} placeholder={placeholder} onChange={onChange} required className="px-4 py-2 bg-[#0A0A0A] border border-gray-700 rounded-lg" />
-    </div>
-  );
-}
-
-function Divider() {
-  return (
-    <div className="flex items-center my-6">
-      <div className="flex-1 h-px bg-gray-700" />
-      <span className="px-4 text-xs text-gray-500">OR</span>
-      <div className="flex-1 h-px bg-gray-700" />
+    <div className="flex flex-col gap-2">
+      <label className="text-sm font-medium text-gray-300">{label}</label>
+      <input 
+        type={type} 
+        placeholder={placeholder} 
+        onChange={onChange} 
+        required 
+        className="w-full px-4 py-3 bg-[#0A0A0A] border border-gray-700 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-[#FF4A1F] focus:ring-1 focus:ring-[#FF4A1F] transition-all" 
+      />
     </div>
   );
 }
 
 function PasswordStrengthIndicator({ strength }) {
   const map = { weak: "bg-red-500", medium: "bg-yellow-500", strong: "bg-green-500" };
-  if (!map[strength]) return null;
-  return (
-    <div className="mt-2 flex items-center gap-2 text-sm">
-      <div className={`w-20 h-1 rounded ${map[strength]}`} />
-      <span className="text-gray-400 capitalize">{strength}</span>
-    </div>
-  );
-}
+  
+  if (!map[strength] || strength === "empty") return null;
 
-function OAuthButton({ label, icon, provider }) {
-  const handleOAuth = async () => { await supabase.auth.signInWithOAuth({ provider }); };
   return (
-    <button onClick={handleOAuth} className="w-full flex items-center justify-center gap-3 py-3 mt-3 bg-[#111] border border-gray-800 rounded-xl">
-      <img src={icon} className="w-5 h-5" alt={provider} />
-      {label}
-    </button>
+    <div className="flex items-center gap-3 text-sm pt-2">
+      <div className="flex gap-1 h-1.5 w-24">
+        <div className={`h-full flex-1 rounded-full ${strength === 'weak' || strength === 'medium' || strength === 'strong' ? map[strength] : 'bg-gray-700'}`} />
+        <div className={`h-full flex-1 rounded-full ${strength === 'medium' || strength === 'strong' ? map[strength] : 'bg-gray-700'}`} />
+        <div className={`h-full flex-1 rounded-full ${strength === 'strong' ? map[strength] : 'bg-gray-700'}`} />
+      </div>
+      <span className="text-gray-400 capitalize text-xs font-medium">{strength}</span>
+    </div>
   );
 }
