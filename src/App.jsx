@@ -29,6 +29,11 @@ import AddQuestionPage from "./pages/Teacher/AddQuestionPage";
 import ManageCourses from "./pages/Teacher/ManageCourses";
 import ReviewDashboard from './pages/Teacher/ReviewDashboard';
 
+// Freemium & Admin Features
+import CheckoutPage from './pages/student/CheckoutPage';
+import PlacementGuidance from './pages/student/PlacementGuidance';
+import AdminPayments from './pages/Teacher/AdminPayments';
+
 const pageMotionProps = {
   initial: { opacity: 0, y: 10 },
   animate: { opacity: 1, y: 0 },
@@ -56,19 +61,23 @@ function AnimatedRoutes() {
            {/* Student Routes */}
            <Route path="courses" element={<motion.div {...pageMotionProps}><CoursesList /></motion.div>} />
            <Route path="internships" element={<motion.div {...pageMotionProps}><InternshipDashboard /></motion.div>} />
-           
-           {/* CORRECTED ASSIGNMENTS ROUTE (Removed the duplicate) */}
            <Route path="assignments" element={<motion.div {...pageMotionProps}><StudentAssignmentViewWrapper /></motion.div>} />
-           
            <Route path="interviews" element={<motion.div {...pageMotionProps}><MockInterviewWrapper /></motion.div>} />
            <Route path="practice" element={<motion.div {...pageMotionProps}><QuestionListPage /></motion.div>} />
+           
+           {/* NEW: Freemium & Guidance Routes */}
+           <Route path="checkout" element={<motion.div {...pageMotionProps}><CheckoutPage /></motion.div>} />
+           <Route path="placement-guidance" element={<motion.div {...pageMotionProps}><PlacementGuidance /></motion.div>} />
            
            {/* Teacher Specific Routes */}
            <Route path="teacher/create-internship" element={<CreateInternship />} />
            <Route path="teacher/add-question" element={<AddQuestionPage />} />
            <Route path="teacher/manage-courses" element={<ManageCourses />} />
            <Route path="teacher/assignments" element={<motion.div {...pageMotionProps}><AssignmentManager /></motion.div>} />
-            <Route path="teacher/reviews" element={<ReviewDashboard />} />
+           <Route path="teacher/reviews" element={<ReviewDashboard />} />
+           
+           {/* NEW: Admin Payments Route */}
+           <Route path="admin/payments" element={<motion.div {...pageMotionProps}><AdminPayments /></motion.div>} />
         </Route>
 
         {/* FULL SCREEN MODES (No Top Nav) */}
@@ -87,7 +96,6 @@ function AnimatedRoutes() {
 
 // --- WRAPPERS ---
 
-// 1. Assignment Wrapper (Fixes the "User is undefined" error)
 function StudentAssignmentViewWrapper() {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -105,7 +113,6 @@ function StudentAssignmentViewWrapper() {
     return <StudentAssignmentView user={user} />;
 }
 
-// 2. Internship Workspace Wrapper
 function InternshipWorkspaceWrapper() {
     const [user, setUser] = useState(null);
     const { projectId } = useParams();
@@ -114,7 +121,6 @@ function InternshipWorkspaceWrapper() {
     return <InternshipWorkspace user={user} projectId={projectId} />;
 }
 
-// 3. Mock Interview Wrappers
 function MockInterviewWrapper() {
   const [user, setUser] = useState(null);
   useEffect(() => { supabase.auth.getUser().then(({data}) => setUser(data.user)) }, []);

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Outlet, useLocation, Link, useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
-import { LogOut, User, Bell, ChevronDown, Flame } from "lucide-react";
+import { LogOut, User, Bell, ChevronDown, Flame, Star } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function DashboardLayout() {
@@ -18,10 +18,8 @@ export default function DashboardLayout() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // --- 1. SINGLE INITIALIZATION EFFECT (Clean & Fast) ---
   useEffect(() => {
     const initData = async () => {
-      // A. Check Auth
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         navigate("/login");
@@ -29,20 +27,14 @@ export default function DashboardLayout() {
       }
       setUser(user);
       
-      // B. Determine Role
       const rawRole = user.app_metadata?.user_role || user.user_metadata?.user_role || 'student';
       setRole(rawRole);
 
-      // C. Student Specific Logic (Streak & Notifs)
       if (rawRole === 'student') {
-          // 1. Sync Streak (Server-Side Calculation)
           const { data: streakData } = await supabase.rpc('check_daily_streak');
           if (streakData) {
-              console.log("Streak Sync:", streakData);
               setStreak(streakData.streak);
           }
-
-          // 2. Fetch Notifications
           fetchNotifications(user.id);
       }
     };
@@ -50,7 +42,6 @@ export default function DashboardLayout() {
     initData();
   }, [navigate]);
 
-  // --- 2. NOTIFICATION HELPERS ---
   const fetchNotifications = async (userId) => {
       const { data } = await supabase
           .from('notifications')
@@ -68,12 +59,10 @@ export default function DashboardLayout() {
   const markRead = async () => {
       if (unreadCount === 0) return;
       
-      // Update Local State (Instant UI feedback)
       const updated = notifications.map(n => ({ ...n, is_read: true }));
       setNotifications(updated);
       setUnreadCount(0);
       
-      // Update Database (Background)
       await supabase
           .from('notifications')
           .update({ is_read: true })
@@ -86,7 +75,7 @@ export default function DashboardLayout() {
     navigate("/");
   };
 
-  // --- 3. NAVIGATION LINKS ---
+  // --- 3. NAVIGATION LINKS (Fixed Paths) ---
   const studentLinks = [
     { name: "Overview", path: "/dashboard" },
     { name: "Internships", path: "/dashboard/internships" },
@@ -94,6 +83,7 @@ export default function DashboardLayout() {
     { name: "Assignments", path: "/dashboard/assignments" },
     { name: "Practice", path: "/dashboard/practice" },
     { name: "Mock Interview", path: "/dashboard/interviews" }, 
+    { name: "1-on-1 Guidance", path: "/dashboard/placement-guidance" }, // FIXED PATH
   ];
 
   const teacherLinks = [
@@ -118,11 +108,11 @@ export default function DashboardLayout() {
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 group">
+          <Link to="/" className="flex items-center gap-2 group shrink-0">
             <div className="w-8 h-8 rounded-lg bg-[#FF4A1F] flex items-center justify-center font-bold text-white text-sm group-hover:rotate-12 transition-transform">
               FB
             </div>
-            <span className="font-bold tracking-tight">Fox Bird</span>
+            <span className="font-bold tracking-tight hidden sm:block">Fox Bird</span>
             {isTeacher && (
                 <span className="hidden sm:block text-[10px] bg-white/10 px-2 py-0.5 rounded text-gray-400 border border-white/5 uppercase tracking-wide">
                     Instructor
@@ -131,14 +121,14 @@ export default function DashboardLayout() {
           </Link>
 
           {/* Desktop Links */}
-          <div className="hidden md:flex items-center gap-1">
+          <div className="hidden lg:flex items-center gap-1 overflow-x-auto mx-4 no-scrollbar">
             {currentLinks.map((link) => {
               const isActive = location.pathname === link.path;
               return (
                 <Link
                   key={link.path}
                   to={link.path}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                  className={`px-3 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap ${
                     isActive 
                       ? "bg-white/10 text-white" 
                       : "text-gray-400 hover:text-white hover:bg-white/5"
@@ -151,9 +141,20 @@ export default function DashboardLayout() {
           </div>
 
           {/* Right Side Actions */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 md:gap-4 shrink-0">
             
-            {/* STREAK INDICATOR (Students Only) */}
+            {/* UPGRADE TO PRO CTA (Fixed Path) */}
+            {!isTeacher && (
+              <Link
+                to="/dashboard/checkout" 
+                className="hidden sm:flex items-center gap-1.5 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white px-3 py-1.5 rounded-full text-xs font-bold hover:shadow-lg hover:shadow-yellow-500/20 transition-all border border-yellow-400/50"
+              >
+                <Star size={14} className="fill-white" />
+                Upgrade Pro
+              </Link>
+            )}
+
+            {/* STREAK INDICATOR */}
             {!isTeacher && (
                 <div className="hidden sm:flex items-center gap-1 text-orange-500 bg-orange-500/10 px-3 py-1.5 rounded-full border border-orange-500/20" title="Daily Streak">
                     <Flame size={16} className={streak > 0 ? "fill-orange-500 animate-pulse" : ""} />
@@ -173,7 +174,6 @@ export default function DashboardLayout() {
                     )}
                 </button>
 
-                {/* Notification Dropdown */}
                 <AnimatePresence>
                     {isNotifOpen && (
                         <motion.div
@@ -236,13 +236,22 @@ export default function DashboardLayout() {
                     </div>
                     
                     {/* Mobile Links */}
-                    <div className="md:hidden border-b border-white/5 pb-2 mb-2">
+                    <div className="lg:hidden border-b border-white/5 pb-2 mb-2">
                         {currentLinks.map(link => (
                             <Link key={link.path} to={link.path} onClick={() => setIsProfileDropdownOpen(false)} className="block px-4 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5">
                                 {link.name}
                             </Link>
                         ))}
                     </div>
+
+                    {/* Mobile Upgrade Pro Button (Fixed Path) */}
+                    {!isTeacher && (
+                      <div className="sm:hidden border-b border-white/5 pb-2 mb-2">
+                        <Link to="/dashboard/checkout" onClick={() => setIsProfileDropdownOpen(false)} className="flex items-center gap-2 px-4 py-2 text-sm text-yellow-500 hover:bg-white/5 hover:text-yellow-400 font-bold">
+                          <Star size={16} className="fill-yellow-500" /> Upgrade Pro
+                        </Link>
+                      </div>
+                    )}
 
                     <Link to="/dashboard/settings" className="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 hover:bg-white/5 hover:text-white">
                       <User size={16} /> Profile Settings

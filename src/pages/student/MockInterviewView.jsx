@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom"; // 1. ADDED MISSING IMPORT
 import { Mic, BookOpen, Code, Loader2, Shuffle, Camera, Lock, CheckCircle, AlertTriangle } from "lucide-react";
 import { supabase } from "../../supabaseClient";
 
@@ -24,12 +25,29 @@ export default function MockInterviewView({ user, initialSessionId }) {
   const [isProctored, setIsProctored] = useState(false);
   const [cameraStream, setCameraStream] = useState(null);
   const videoRef = useRef(null);
+  const [userProfile, setUserProfile] = useState(null);
+  const navigate = useNavigate();
 
   // --- 1. INITIALIZATION ---
   useEffect(() => {
     if (initialSessionId) loadExistingSession(initialSessionId);
     else fetchHistory();
   }, [initialSessionId, user]);
+
+  useEffect(() => {
+    const fetchUserStatus = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if(user) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('id, mock_interviews_used, is_premium')
+          .eq('id', user.id)
+          .single();
+        setUserProfile(data);
+      }
+    };
+    fetchUserStatus();
+  }, []);
 
   const fetchHistory = async () => {
     if (!user) return;
@@ -59,7 +77,6 @@ export default function MockInterviewView({ user, initialSessionId }) {
       if (session.status === 'completed') {
           setStage("summary");
       } else {
-          // --- FIX: Don't go to dashboard yet. Go to setup to force camera enable ---
           setStage("setup_proctoring");
       }
 
@@ -69,12 +86,10 @@ export default function MockInterviewView({ user, initialSessionId }) {
   // --- 2. PROCTORING LOGIC ---
   const enableProctoring = async () => {
     try {
-      // 1. Request Fullscreen FIRST
       const elem = document.documentElement;
       if (elem.requestFullscreen) await elem.requestFullscreen();
       else if (elem.webkitRequestFullscreen) await elem.webkitRequestFullscreen();
 
-      // 2. Request Camera SECOND
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       setCameraStream(stream);
       setIsProctored(true);
@@ -137,8 +152,31 @@ export default function MockInterviewView({ user, initialSessionId }) {
 
   // --- ACTIONS ---
   const handleStartSession = async (practiceSet) => {
+    if (!userProfile) {
+        alert("Loading profile data, please wait a moment.");
+        return;
+    }
+
+    // 2. CHECK PAYWALL FIRST (Before camera turns on)
+    if (userProfile.mock_interviews_used >= 1 && !userProfile.is_premium) {
+      alert("Free trial ended! Please upgrade to Pro to continue unlimited mock interviews.");
+      navigate('/dashboard/checkout'); // Use correct nested route
+      return; 
+    }
+
+    // 3. ENABLE PROCTORING AFTER PAYWALL CHECK
     const success = await enableProctoring();
     if (!success) return; 
+
+    // 4. INCREMENT FREE USAGE IN DB
+    if (!userProfile.is_premium) {
+      await supabase.from('profiles')
+        .update({ mock_interviews_used: userProfile.mock_interviews_used + 1 })
+        .eq('id', userProfile.id);
+        
+      // Update local state so they can't spam click
+      setUserProfile(prev => ({ ...prev, mock_interviews_used: prev.mock_interviews_used + 1 }));
+    }
 
     try {
       const { data, error } = await supabase.from('mock_interview_sessions').insert([{
@@ -224,7 +262,7 @@ export default function MockInterviewView({ user, initialSessionId }) {
         </div>
       )}
 
-      {/* 2. SETUP PROCTORING (The Fix) */}
+      {/* 2. SETUP PROCTORING */}
       {stage === "setup_proctoring" && (
         <div className="flex flex-col items-center justify-center min-h-screen bg-black text-center p-6 animate-in fade-in">
             <div className="w-24 h-24 bg-red-500/10 rounded-full flex items-center justify-center mb-6 text-red-500 border border-red-500/20">
