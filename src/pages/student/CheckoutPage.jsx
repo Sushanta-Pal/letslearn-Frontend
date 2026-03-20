@@ -40,11 +40,11 @@ const CheckoutPage = () => {
   return (
     <div className="max-w-md mx-auto mt-10 p-6 bg-white rounded-xl shadow-md text-center">
       <h2 className="text-2xl font-bold mb-4">Upgrade to Platform Pro</h2>
-      <p className="text-gray-600 mb-6">Unlock unlimited mock interviews and coding guidance. Price: ₹299</p>
+      <p className="text-gray-600 mb-6">Unlock unlimited mock interviews and coding guidance. Price: ₹99</p>
       
       <div className="bg-gray-100 p-4 rounded-lg mb-6 flex flex-col items-center">
         {/* Make sure you add your actual QR code image to the public folder */}
-        <img src="/images/upi-qr.jpeg" alt="Scan to Pay" className="w-48 h-48 mb-2 border-2 border-dashed border-gray-300" />
+        <img src="/images/upi-qr (1).png" alt="Scan to Pay" className="w-48 h-48 mb-2 border-2 border-dashed border-gray-300" />
         <p className="font-semibold text-sm">Scan with PhonePe, GPay, or Paytm</p>
         <p className="text-xs text-gray-500 mt-1">UPI ID: 8918357997-2@ybl</p>
       </div>
