@@ -35,7 +35,7 @@ export default function PricingPage() {
     },
     {
       name: "Pro",
-      price: "₹499",
+      price: "₹99",
       period: "per month",
       description: "Everything you need to crack top MNCs like Infosys, TCS, and Wipro.",
       features: [
@@ -46,7 +46,7 @@ export default function PricingPage() {
         { name: "2 live mentor sessions/month", included: true },
         { name: "Placement leaderboard", included: true },
       ],
-      buttonText: "Start 7-Day Free Trial",
+      buttonText: "Start with Pro",
       buttonVariant: "primary",
       highlighted: true,
       badge: "⭐ Most Popular",
@@ -54,7 +54,7 @@ export default function PricingPage() {
     },
     {
       name: "Premium",
-      price: "₹1,499",
+      price: "₹999",
       period: "lifetime access",
       description: "The ultimate arsenal for the entire placement season.",
       features: [
