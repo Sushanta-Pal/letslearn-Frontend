@@ -3,17 +3,20 @@ import { BrowserRouter, Routes, Route, useLocation, useParams, Navigate } from "
 import { AnimatePresence, motion } from "framer-motion";
 import { supabase } from './supabaseClient';
 
-// Pages
+// --- NEW: Public Marketing Pages ---
+import PublicLayout from "./layouts/PublicLayout";
+import LandingPage from "./pages/public/LandingPage";
+import PricingPage from "./pages/public/PricingPage";
+import AboutFounder from "./pages/public/AboutFounder";
+
+// --- Auth Pages ---
 import LoginPage from "./pages/LoginPage";
 import SignUpPage from "./pages/SignUpPage";
-import DashboardLanding from "./pages/Dashboard"; 
-import AssignmentManager from "./pages/Teacher/AssignmentManager";
-import StudentAssignmentView from "./pages/student/StudentAssignmentView";
 
-// Layouts
+// --- Layouts ---
 import DashboardLayout from "./layouts/DashboardLayout";
 
-// Student Views
+// --- Student Views ---
 import DashboardOverview from "./pages/student/DashboardOverview";
 import CoursesList from "./pages/student/CoursesList";
 import QuestionListPage from "./pages/student/QuestionList";
@@ -22,14 +25,16 @@ import InternshipWorkspace from "./pages/student/Internship/InternshipWorkspace"
 import MockInterviewView from "./pages/student/MockInterviewView";
 import CourseViewer from "./pages/student/CourseViewer";
 import SolveProblemPage from "./pages/student/SolveProblemPage";
+import StudentAssignmentView from "./pages/student/StudentAssignmentView";
 
-// Teacher Views
+// --- Teacher Views ---
 import CreateInternship from "./pages/Teacher/CreateInternship";
 import AddQuestionPage from "./pages/Teacher/AddQuestionPage";
 import ManageCourses from "./pages/Teacher/ManageCourses";
 import ReviewDashboard from './pages/Teacher/ReviewDashboard';
+import AssignmentManager from "./pages/Teacher/AssignmentManager";
 
-// Freemium & Admin Features
+// --- Freemium & Admin Features ---
 import CheckoutPage from './pages/student/CheckoutPage';
 import PlacementGuidance from './pages/student/PlacementGuidance';
 import AdminPayments from './pages/Teacher/AdminPayments';
@@ -48,12 +53,24 @@ function AnimatedRoutes() {
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
         
-        {/* PUBLIC ROUTES */}
-        <Route path="/" element={<motion.div {...pageMotionProps}><DashboardLanding /></motion.div>} />
+        {/* =========================================
+            1. PUBLIC FUNNEL (Marketing Pages) 
+            ========================================= */}
+        <Route element={<PublicLayout />}>
+          <Route path="/" element={<motion.div {...pageMotionProps}><LandingPage /></motion.div>} />
+          <Route path="/pricing" element={<motion.div {...pageMotionProps}><PricingPage /></motion.div>} />
+          <Route path="/founder" element={<motion.div {...pageMotionProps}><AboutFounder /></motion.div>} />
+        </Route>
+
+        {/* =========================================
+            2. AUTHENTICATION ROUTES
+            ========================================= */}
         <Route path="/login" element={<motion.div {...pageMotionProps}><LoginPage /></motion.div>} />
         <Route path="/signup" element={<motion.div {...pageMotionProps}><SignUpPage /></motion.div>} />
 
-        {/* PROTECTED DASHBOARD ROUTES (Wrapped in Layout) */}
+        {/* =========================================
+            3. PROTECTED DASHBOARD ROUTES
+            ========================================= */}
         <Route path="/dashboard" element={<DashboardLayout />}>
            {/* The "Index" is the Overview */}
            <Route index element={<motion.div {...pageMotionProps}><DashboardOverview /></motion.div>} />
@@ -65,7 +82,7 @@ function AnimatedRoutes() {
            <Route path="interviews" element={<motion.div {...pageMotionProps}><MockInterviewWrapper /></motion.div>} />
            <Route path="practice" element={<motion.div {...pageMotionProps}><QuestionListPage /></motion.div>} />
            
-           {/* NEW: Freemium & Guidance Routes */}
+           {/* Freemium & Guidance Routes */}
            <Route path="checkout" element={<motion.div {...pageMotionProps}><CheckoutPage /></motion.div>} />
            <Route path="placement-guidance" element={<motion.div {...pageMotionProps}><PlacementGuidance /></motion.div>} />
            
@@ -76,11 +93,13 @@ function AnimatedRoutes() {
            <Route path="teacher/assignments" element={<motion.div {...pageMotionProps}><AssignmentManager /></motion.div>} />
            <Route path="teacher/reviews" element={<ReviewDashboard />} />
            
-           {/* NEW: Admin Payments Route */}
+           {/* Admin Payments Route */}
            <Route path="admin/payments" element={<motion.div {...pageMotionProps}><AdminPayments /></motion.div>} />
         </Route>
 
-        {/* FULL SCREEN MODES (No Top Nav) */}
+        {/* =========================================
+            4. FULL SCREEN MODES (No Top Nav/Sidebar)
+            ========================================= */}
         <Route path="/student/internship/:projectId" element={<InternshipWorkspaceWrapper />} />
         <Route path="/student/course/:courseId" element={<CourseViewer />} />
         <Route path="/student/solve/:questionId" element={<SolveProblemPage />} />
@@ -88,13 +107,13 @@ function AnimatedRoutes() {
 
         {/* Redirects */}
         <Route path="/profile" element={<Navigate to="/dashboard" replace />} />
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} /> {/* Changed fallback to landing page */}
       </Routes>
     </AnimatePresence>
   );
 }
 
-// --- WRAPPERS ---
+// --- WRAPPERS (Kept exactly as you had them) ---
 
 function StudentAssignmentViewWrapper() {
     const [user, setUser] = useState(null);
