@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { motion, useAnimation, useMotionValue, useTransform } from 'framer-motion';
+import { motion, useMotionValue, useTransform } from 'framer-motion';
 import { 
   ArrowRight, CheckCircle2, Star, LayoutDashboard, Briefcase, 
   BookOpen, FileEdit, Dumbbell, Mic, Users, Crown, Sparkles, 
-  BarChart3, Building2, Check, Loader2 
+  BarChart3, Check, Loader2 
 } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
-import { supabase } from '../../supabaseClient'; // Ensure this path is correct
+import { supabase } from '../../supabaseClient'; 
 
 // --- Advanced 3D Hover Card Wrapper ---
 const Hover3DCard = ({ children, className }) => {
@@ -55,7 +55,7 @@ const Reveal = ({ children, delay = 0, direction = "up" }) => {
 
 // --- Infinite Testimonial Slider ---
 const InfiniteSlider = ({ items }) => {
-  const duplicatedItems = [...items, ...items, ...items]; // Triple for seamless looping
+  const duplicatedItems = [...items, ...items, ...items]; 
 
   return (
     <div className="relative w-full overflow-hidden py-10">
@@ -76,7 +76,6 @@ const InfiniteSlider = ({ items }) => {
             </div>
             <p className="text-neutral-300 mb-8 leading-relaxed text-sm md:text-base flex-grow">"{testi.quote}"</p>
             <div className="flex items-center gap-4 border-t border-neutral-800 pt-6">
-              {/* Added Photo Integration */}
               {testi.avatar_url ? (
                 <img src={testi.avatar_url} alt={testi.name} className="w-12 h-12 rounded-full object-cover border-2 border-neutral-800 group-hover:border-[#FF4A1F] transition-colors" />
               ) : (
@@ -100,31 +99,31 @@ export default function LandingPage() {
   const [testimonials, setTestimonials] = useState([]);
   const [loadingTesti, setLoadingTesti] = useState(true);
 
+  const defaultTestimonials = [
+    { quote: "The mock interview feedback was a game-changer. It caught that I was fumbling my STAR method answers. Fixed it and cracked Infosys.", name: "Priya K.", role: "SDE — Infosys", avatar_url: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80" },
+    { quote: "I was ignoring aptitude until I saw my Placium dashboard scores. The practice sets are exactly what companies ask.", name: "Arjun M.", role: "Associate — Wipro", avatar_url: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?auto=format&fit=crop&w=150&q=80" },
+    { quote: "Upgrading to Pro for the 1-on-1 guidance was the best ROI. My mentor completely restructured my ATS resume.", name: "Sneha B.", role: "Analyst — TCS", avatar_url: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=150&q=80" },
+  ];
+
   useEffect(() => {
     const fetchTestimonials = async () => {
       try {
-        // Fetch data from the table we just created, order by newest first
-        const { data, error } = await supabase
-          .from('testimonials')
-          .select('*')
-          .order('created_at', { ascending: false });
-
+        const { data, error } = await supabase.from('testimonials').select('*').order('created_at', { ascending: false });
         if (error) throw error;
-        
-        if (data) {
+        if (data && data.length > 0) {
           setTestimonials(data);
+        } else {
+          setTestimonials(defaultTestimonials);
         }
       } catch (error) {
-        console.error("Error fetching testimonials:", error.message);
+        console.error("Error fetching testimonials, using fallback.", error.message);
+        setTestimonials(defaultTestimonials);
       } finally {
         setLoadingTesti(false);
       }
     };
-
     fetchTestimonials();
   }, []);
-
-  
 
   const features = [
     { icon: LayoutDashboard, title: "Overview", desc: "Your personal command center. Track your ATS score, upcoming interviews, and daily progress." },
@@ -201,105 +200,88 @@ export default function LandingPage() {
             </Reveal>
           </div>
 
-          {/* Right Visual - Crazy 3D Floating Widgets */}
-          {/* Right Visual - Pro, Easy-to-Understand Floating Widgets */}
+          {/* Right Visual - Redesigned Pro Floating Widgets */}
           <Reveal delay={0.4} direction="left">
-            <Hover3DCard className="relative w-full h-[450px] lg:h-[600px] flex items-center justify-center">
+            <Hover3DCard className="relative w-full h-[380px] md:h-[450px] lg:h-[600px] flex items-center justify-center mt-12 md:mt-0">
               
-              {/* Central Widget: AI Interview Feedback */}
+              {/* Pulsing Holographic Aura for the widgets */}
+              <motion.div 
+                animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
+                transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute w-64 h-64 md:w-96 md:h-96 bg-gradient-to-tr from-[#FF4A1F]/20 to-orange-500/10 rounded-full blur-3xl z-0"
+              />
+
+              {/* Main Central Widget: AI Interview Feedback */}
               <motion.div 
                 animate={{ y: [-8, 8, -8] }} 
                 transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute z-20 w-[95%] md:w-[360px] bg-neutral-900/95 backdrop-blur-2xl border border-neutral-800 rounded-2xl shadow-2xl p-5"
+                className="absolute z-20 w-[280px] sm:w-[320px] md:w-[400px] bg-neutral-900/90 backdrop-blur-2xl border border-neutral-800/80 rounded-3xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.7)] p-5 md:p-7"
               >
                 {/* Header */}
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-[#FF4A1F]/10 border border-[#FF4A1F]/20 rounded-xl flex items-center justify-center">
-                      <Mic className="w-5 h-5 text-[#FF4A1F]" />
+                <div className="flex items-center justify-between mb-5 md:mb-6">
+                  <div className="flex items-center gap-3 md:gap-4">
+                    <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-[#FF4A1F]/20 to-orange-500/10 border border-[#FF4A1F]/30 rounded-xl md:rounded-2xl flex items-center justify-center shadow-inner">
+                      <Mic className="w-5 h-5 md:w-6 md:h-6 text-[#FF4A1F]" />
                     </div>
                     <div>
-                      <p className="text-sm font-bold text-white leading-none mb-1">AI Feedback</p>
-                      <p className="text-xs text-neutral-400 font-medium">Technical Round</p>
+                      <p className="text-sm md:text-base font-bold text-white leading-none mb-1">AI Feedback</p>
+                      <p className="text-[10px] md:text-xs text-neutral-400 font-medium">Technical Round</p>
                     </div>
                   </div>
-                  <div className="bg-green-500/10 border border-green-500/20 text-green-400 px-2.5 py-1 rounded-md text-xs font-bold">
+                  <div className="bg-green-500/10 border border-green-500/20 text-green-400 px-2.5 py-1 md:px-3 md:py-1.5 rounded-lg text-xs font-bold">
                     88 / 100
                   </div>
                 </div>
                 
                 {/* Summary Box */}
-                <div className="bg-neutral-950/60 border border-neutral-800/50 rounded-xl p-3 mb-5">
-                  <p className="text-xs text-neutral-300 leading-relaxed">
-                    <span className="text-white font-bold">Strong:</span> Great STAR method usage.<br/>
+                <div className="bg-neutral-950/60 border border-neutral-800/50 rounded-xl p-3 md:p-4 mb-5 md:mb-6">
+                  <p className="text-xs md:text-sm text-neutral-300 leading-relaxed">
+                    <span className="text-white font-bold">Strong:</span> Excellent STAR method usage.<br/>
                     <span className="text-orange-400 font-bold">Focus:</span> Pacing is slightly fast.
                   </p>
                 </div>
 
                 {/* Metrics */}
-                <div className="space-y-4">
+                <div className="space-y-3 md:space-y-4">
                   <div>
-                    <div className="flex justify-between text-xs font-medium mb-1.5">
+                    <div className="flex justify-between text-xs md:text-sm font-medium mb-1.5 md:mb-2">
                       <span className="text-neutral-400">Communication</span>
-                      <span className="text-white">92%</span>
+                      <span className="text-white font-bold">92%</span>
                     </div>
-                    <div className="h-1.5 w-full bg-neutral-800 rounded-full overflow-hidden">
+                    <div className="h-1.5 md:h-2 w-full bg-neutral-800 rounded-full overflow-hidden">
                       <motion.div initial={{ width: 0 }} animate={{ width: "92%" }} transition={{ duration: 1.5, delay: 0.5 }} className="h-full bg-[#FF4A1F] rounded-full"></motion.div>
                     </div>
                   </div>
                   
                   <div>
-                    <div className="flex justify-between text-xs font-medium mb-1.5">
+                    <div className="flex justify-between text-xs md:text-sm font-medium mb-1.5 md:mb-2">
                       <span className="text-neutral-400">Technical Depth</span>
-                      <span className="text-white">85%</span>
+                      <span className="text-white font-bold">85%</span>
                     </div>
-                    <div className="h-1.5 w-full bg-neutral-800 rounded-full overflow-hidden">
+                    <div className="h-1.5 md:h-2 w-full bg-neutral-800 rounded-full overflow-hidden">
                       <motion.div initial={{ width: 0 }} animate={{ width: "85%" }} transition={{ duration: 1.5, delay: 0.7 }} className="h-full bg-orange-400 rounded-full"></motion.div>
                     </div>
                   </div>
                 </div>
               </motion.div>
 
-              {/* Top Right Widget: ATS Resume Score */}
+              {/* Top Accent Widget: ATS Resume Score */}
               <motion.div 
                 animate={{ y: [10, -10, 10] }} 
                 transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-                className="absolute -top-2 -right-0 md:-top-6 md:-right-4 z-30 w-52 bg-neutral-900/95 backdrop-blur-2xl border border-neutral-800 p-5 rounded-2xl shadow-2xl"
+                className="absolute -top-8 right-0 md:-top-6 md:-right-8 z-30 w-44 md:w-56 bg-neutral-900/95 backdrop-blur-3xl border border-neutral-800 p-4 md:p-5 rounded-2xl shadow-[0_30px_60px_-15px_rgba(0,0,0,0.8)]"
               >
-                <div className="flex items-center gap-2.5 mb-3">
-                  <div className="bg-neutral-800 p-1.5 rounded-lg">
-                    <BarChart3 className="text-white w-4 h-4" />
+                <div className="flex items-center gap-2 mb-2 md:mb-3">
+                  <div className="bg-neutral-800/80 p-1.5 md:p-2 rounded-lg">
+                    <BarChart3 className="text-white w-4 h-4 md:w-5 md:h-5" />
                   </div>
-                  <p className="text-xs font-bold text-neutral-300 uppercase tracking-wider">ATS Match</p>
+                  <p className="text-[10px] md:text-xs font-bold text-neutral-400 uppercase tracking-wider">ATS Match</p>
                 </div>
                 <div className="flex items-baseline gap-1 mb-2">
-                  <span className="text-4xl font-black text-white">94%</span>
+                  <span className="text-3xl md:text-4xl font-black text-white">94%</span>
                 </div>
-                <div className="flex items-center gap-1.5 text-xs font-bold text-green-400">
+                <div className="flex items-center gap-1.5 text-[10px] md:text-xs font-bold text-green-400 bg-green-500/10 px-2 py-1.5 rounded-md w-max">
                   <CheckCircle2 className="w-3.5 h-3.5" /> Shortlist Ready
-                </div>
-              </motion.div>
-
-              {/* Bottom Left Widget: Job Notification */}
-              <motion.div 
-                animate={{ y: [-8, 8, -8] }} 
-                transition={{ duration: 5.5, repeat: Infinity, ease: "easeInOut", delay: 2 }}
-                className="absolute -bottom-6 -left-0 md:-bottom-10 md:-left-8 z-10 w-60 bg-neutral-900/95 backdrop-blur-2xl border border-neutral-800 p-4 rounded-2xl shadow-2xl"
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="w-8 h-8 bg-blue-500/10 border border-blue-500/20 rounded-lg flex items-center justify-center">
-                    <Building2 className="w-4 h-4 text-blue-400" />
-                  </div>
-                  <span className="text-[9px] font-bold uppercase tracking-widest text-[#FF4A1F] bg-[#FF4A1F]/10 px-2 py-1 rounded-md">
-                    New Drive
-                  </span>
-                </div>
-                <p className="text-sm font-bold text-white mb-0.5">Infosys SP L1 Role</p>
-                <p className="text-xs text-neutral-400 font-medium mb-4">Package: 9.5 LPA</p>
-                
-                {/* Phantom Button for visual hierarchy */}
-                <div className="w-full py-2 bg-neutral-800/50 text-neutral-300 text-xs font-bold rounded-lg text-center border border-neutral-700/50">
-                  View Details
                 </div>
               </motion.div>
 
