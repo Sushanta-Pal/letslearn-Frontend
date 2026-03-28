@@ -51,7 +51,7 @@ export default function SolveProblemPage() {
               },
               body: JSON.stringify({
                   name: repoName,
-                  description: 'My Data Structures & Algorithms Solutions powered by Fox Bird',
+                  description: 'My Data Structures & Algorithms Solutions powered by Placium',
                   private: false,
                   auto_init: true
               })

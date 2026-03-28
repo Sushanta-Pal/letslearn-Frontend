@@ -102,7 +102,7 @@ const CertificateModal = ({ certificate, user, onClose }) => {
         <div className="flex-1 overflow-auto bg-neutral-900 p-8 flex justify-center items-center">
           
           {/* THE CERTIFICATE */}
-          <div ref={certificateRef} className="relative w-[1123px] h-[794px] bg-[#fffbf0] text-black shrink-0 shadow-2xl mx-auto overflow-hidden">
+          <div ref={certificateRef} className="relative w-[1123px] h-[794px] bg-[#ffPLf0] text-black shrink-0 shadow-2xl mx-auto overflow-hidden">
             
             {/* 1. Background Texture */}
             <div className="absolute inset-0 opacity-40 mix-blend-multiply pointer-events-none" style={{ backgroundImage: `url("https://www.transparenttextures.com/patterns/cream-paper.png")` }}></div>

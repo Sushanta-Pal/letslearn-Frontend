@@ -81,7 +81,7 @@ const InternshipWorkspace = ({ user }) => {
                 headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     name: repoName,
-                    description: "My Internship Portfolio powered by Fox Bird",
+                    description: "My Internship Portfolio powered by Placium",
                     private: false, 
                     auto_init: true 
                 })

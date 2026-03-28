@@ -71,7 +71,7 @@ export default function CourseCard({ course }) {
           </div>
 
           <div className="flex items-center gap-2">
-            <Star size={16} className="text-[#FFB020]" />
+            <Star size={16} className="text-[#FPL020]" />
             <span>{rating} / 5</span>
           </div>
         </div>

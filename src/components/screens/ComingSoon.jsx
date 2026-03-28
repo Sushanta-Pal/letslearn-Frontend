@@ -79,7 +79,7 @@ function ComingSoon({ onClose }) {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-full bg-[#FF4A1F] flex items-center justify-center font-bold flex-shrink-0 text-black">
-                FB
+                PL
               </div>
               <div>
                 <h3 className="text-2xl font-extrabold leading-snug">

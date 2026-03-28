@@ -72,7 +72,7 @@ export default function SignUpPage() {
       {/* --- Left Panel --- */}
       <div className="hidden lg:flex flex-col justify-between p-12 lg:p-16 w-full lg:w-5/12 bg-[#060606]">
         <div className="sticky top-16">
-          <h1 className="text-xl font-bold tracking-wide">Fox Bird</h1>
+          <h1 className="text-xl font-bold tracking-wide">Placium</h1>
           <h2 className="mt-14 text-4xl lg:text-5xl font-extrabold leading-tight">
             Welcome to the future of
             <div className="text-5xl lg:text-6xl mt-4">
@@ -88,7 +88,7 @@ export default function SignUpPage() {
           </p>
         </div>
         <p className="text-sm text-gray-600 mt-12">
-          © 2025 Fox Bird — All rights reserved.
+          © 2025 Placium — All rights reserved.
         </p>
       </div>
 
@@ -98,7 +98,7 @@ export default function SignUpPage() {
           
           {/* Mobile Header (Hidden on Desktop) */}
           <div className="lg:hidden mb-8 flex justify-center">
-             <h1 className="text-2xl font-bold tracking-wide text-white">Fox Bird</h1>
+             <h1 className="text-2xl font-bold tracking-wide text-white">Placium</h1>
           </div>
 
           <h2 className="text-3xl font-bold text-white">Create your account</h2>

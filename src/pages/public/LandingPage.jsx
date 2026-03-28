@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { motion, useMotionValue, useTransform } from 'framer-motion';
+import { motion, useMotionValue, useTransform, AnimatePresence } from 'framer-motion';
 import { 
   ArrowRight, CheckCircle2, Star, LayoutDashboard, Briefcase, 
   BookOpen, FileEdit, Dumbbell, Mic, Users, Crown, Sparkles, 
-  BarChart3, Check, Loader2 
+  BarChart3, Building2, X, Loader2 
 } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
@@ -76,11 +76,11 @@ const InfiniteSlider = ({ items }) => {
             </div>
             <p className="text-neutral-300 mb-8 leading-relaxed text-sm md:text-base flex-grow">"{testi.quote}"</p>
             <div className="flex items-center gap-4 border-t border-neutral-800 pt-6">
-              {testi.avatar_url ? (
+              {testi.avatar_url && testi.avatar_url !== 'null' ? (
                 <img src={testi.avatar_url} alt={testi.name} className="w-12 h-12 rounded-full object-cover border-2 border-neutral-800 group-hover:border-[#FF4A1F] transition-colors" />
               ) : (
                 <div className="w-12 h-12 rounded-full bg-neutral-800 flex items-center justify-center font-bold text-[#FF4A1F] border-2 border-neutral-700 group-hover:border-[#FF4A1F] transition-colors">
-                  {testi.name.charAt(0)}
+                  {testi.name ? testi.name.charAt(0) : 'P'}
                 </div>
               )}
               <div>
@@ -96,34 +96,83 @@ const InfiniteSlider = ({ items }) => {
 };
 
 export default function LandingPage() {
-  const [testimonials, setTestimonials] = useState([]);
-  const [loadingTesti, setLoadingTesti] = useState(true);
+  // --- States for Testimonials & Modal ---
+  const [sliderTestimonials, setSliderTestimonials] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [loadingInitial, setLoadingInitial] = useState(true);
+  
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalData, setModalData] = useState([]);
+  const [page, setPage] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
 
-  const defaultTestimonials = [
-    { quote: "The mock interview feedback was a game-changer. It caught that I was fumbling my STAR method answers. Fixed it and cracked Infosys.", name: "Priya K.", role: "SDE — Infosys", avatar_url: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80" },
-    { quote: "I was ignoring aptitude until I saw my Placium dashboard scores. The practice sets are exactly what companies ask.", name: "Arjun M.", role: "Associate — Wipro", avatar_url: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?auto=format&fit=crop&w=150&q=80" },
-    { quote: "Upgrading to Pro for the 1-on-1 guidance was the best ROI. My mentor completely restructured my ATS resume.", name: "Sneha B.", role: "Analyst — TCS", avatar_url: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=150&q=80" },
-  ];
+  const BATCH_SIZE = 10;
 
+  // 1. Extremely fast initial load (Only gets count + top 12 items)
   useEffect(() => {
-    const fetchTestimonials = async () => {
+    const fetchInitialData = async () => {
       try {
-        const { data, error } = await supabase.from('testimonials').select('*').order('created_at', { ascending: false });
-        if (error) throw error;
-        if (data && data.length > 0) {
-          setTestimonials(data);
-        } else {
-          setTestimonials(defaultTestimonials);
-        }
+        // Get Exact Count (Ultra fast, doesn't download rows)
+        const { count } = await supabase
+          .from('testimonials')
+          .select('*', { count: 'exact', head: true });
+        
+        setTotalCount(count || 0);
+
+        // Get only top 12 for the slider
+        const { data } = await supabase
+          .from('testimonials')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(12);
+
+        if (data) setSliderTestimonials(data);
       } catch (error) {
-        console.error("Error fetching testimonials, using fallback.", error.message);
-        setTestimonials(defaultTestimonials);
+        console.error("Error fetching initial testimonials:", error);
       } finally {
-        setLoadingTesti(false);
+        setLoadingInitial(false);
       }
     };
-    fetchTestimonials();
+    fetchInitialData();
   }, []);
+
+  // 2. Fetch Pagination Logic for the Modal
+  const fetchModalBatch = async (pageNumber) => {
+    setLoadingMore(true);
+    const start = pageNumber * BATCH_SIZE;
+    const end = start + BATCH_SIZE - 1;
+
+    try {
+      const { data } = await supabase
+        .from('testimonials')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .range(start, end);
+
+      if (data) {
+        setModalData(prev => (pageNumber === 0 ? data : [...prev, ...data]));
+        if (data.length < BATCH_SIZE) setHasMore(false);
+      }
+    } catch (error) {
+      console.error("Error fetching more:", error);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  // Open modal handler
+  const openModal = () => {
+    setIsModalOpen(true);
+    document.body.style.overflow = 'hidden'; // Stop background scrolling
+    if (modalData.length === 0) fetchModalBatch(0);
+  };
+
+  // Close modal handler
+  const closeModal = () => {
+    setIsModalOpen(false);
+    document.body.style.overflow = 'auto';
+  };
 
   const features = [
     { icon: LayoutDashboard, title: "Overview", desc: "Your personal command center. Track your ATS score, upcoming interviews, and daily progress." },
@@ -137,7 +186,7 @@ export default function LandingPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-transparent text-neutral-50 font-sans relative overflow-hidden">
+    <div className="min-h-screen bg-neutral-950 text-neutral-50 font-sans relative overflow-hidden">
       
       <Helmet>
         <title>Placium | Your Campus to Corporate Roadmap</title>
@@ -200,24 +249,20 @@ export default function LandingPage() {
             </Reveal>
           </div>
 
-          {/* Right Visual - Redesigned Pro Floating Widgets */}
           <Reveal delay={0.4} direction="left">
             <Hover3DCard className="relative w-full h-[380px] md:h-[450px] lg:h-[600px] flex items-center justify-center mt-12 md:mt-0">
               
-              {/* Pulsing Holographic Aura for the widgets */}
               <motion.div 
                 animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
                 transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
                 className="absolute w-64 h-64 md:w-96 md:h-96 bg-gradient-to-tr from-[#FF4A1F]/20 to-orange-500/10 rounded-full blur-3xl z-0"
               />
 
-              {/* Main Central Widget: AI Interview Feedback */}
               <motion.div 
                 animate={{ y: [-8, 8, -8] }} 
                 transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
                 className="absolute z-20 w-[280px] sm:w-[320px] md:w-[400px] bg-neutral-900/90 backdrop-blur-2xl border border-neutral-800/80 rounded-3xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.7)] p-5 md:p-7"
               >
-                {/* Header */}
                 <div className="flex items-center justify-between mb-5 md:mb-6">
                   <div className="flex items-center gap-3 md:gap-4">
                     <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-[#FF4A1F]/20 to-orange-500/10 border border-[#FF4A1F]/30 rounded-xl md:rounded-2xl flex items-center justify-center shadow-inner">
@@ -233,7 +278,6 @@ export default function LandingPage() {
                   </div>
                 </div>
                 
-                {/* Summary Box */}
                 <div className="bg-neutral-950/60 border border-neutral-800/50 rounded-xl p-3 md:p-4 mb-5 md:mb-6">
                   <p className="text-xs md:text-sm text-neutral-300 leading-relaxed">
                     <span className="text-white font-bold">Strong:</span> Excellent STAR method usage.<br/>
@@ -241,7 +285,6 @@ export default function LandingPage() {
                   </p>
                 </div>
 
-                {/* Metrics */}
                 <div className="space-y-3 md:space-y-4">
                   <div>
                     <div className="flex justify-between text-xs md:text-sm font-medium mb-1.5 md:mb-2">
@@ -252,20 +295,9 @@ export default function LandingPage() {
                       <motion.div initial={{ width: 0 }} animate={{ width: "92%" }} transition={{ duration: 1.5, delay: 0.5 }} className="h-full bg-[#FF4A1F] rounded-full"></motion.div>
                     </div>
                   </div>
-                  
-                  <div>
-                    <div className="flex justify-between text-xs md:text-sm font-medium mb-1.5 md:mb-2">
-                      <span className="text-neutral-400">Technical Depth</span>
-                      <span className="text-white font-bold">85%</span>
-                    </div>
-                    <div className="h-1.5 md:h-2 w-full bg-neutral-800 rounded-full overflow-hidden">
-                      <motion.div initial={{ width: 0 }} animate={{ width: "85%" }} transition={{ duration: 1.5, delay: 0.7 }} className="h-full bg-orange-400 rounded-full"></motion.div>
-                    </div>
-                  </div>
                 </div>
               </motion.div>
 
-              {/* Top Accent Widget: ATS Resume Score */}
               <motion.div 
                 animate={{ y: [10, -10, 10] }} 
                 transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 1 }}
@@ -284,14 +316,13 @@ export default function LandingPage() {
                   <CheckCircle2 className="w-3.5 h-3.5" /> Shortlist Ready
                 </div>
               </motion.div>
-
             </Hover3DCard>
           </Reveal>
         </div>
       </section>
 
       {/* =========================================
-          2. PLATFORM ECOSYSTEM (Staggered Grid)
+          2. PLATFORM ECOSYSTEM
           ========================================= */}
       <section className="py-24 relative bg-neutral-950 border-t border-neutral-900">
         <div className="container mx-auto px-6">
@@ -339,31 +370,36 @@ export default function LandingPage() {
       </section>
 
       {/* =========================================
-          3. SUPABASE TESTIMONIAL SLIDER
+          3. SUPABASE TESTIMONIALS (WITH VIEW MORE)
           ========================================= */}
-      <section className="py-24 bg-neutral-950 border-y border-neutral-900">
-        <div className="container mx-auto px-6 mb-12">
-          <div className="text-center">
-            <Reveal>
-              <p className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-10">Our alumni are cracking offers at</p>
-              <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16 opacity-50 hover:opacity-100 grayscale hover:grayscale-0 transition-all duration-500 mb-16">
-                  <span className="font-extrabold text-xl md:text-2xl text-white tracking-tighter">TCS</span>
-                  <span className="font-extrabold text-xl md:text-2xl text-[#007CC3] tracking-tighter">Infosys</span>
-                  <span className="font-extrabold text-xl md:text-2xl text-white tracking-tighter">Wipro</span>
-                  <span className="font-extrabold text-xl md:text-2xl text-[#A100FF] tracking-tighter">Accenture</span>
-              </div>
-            </Reveal>
-          </div>
+      <section className="py-24 bg-neutral-950 border-y border-neutral-900 relative">
+        <div className="container mx-auto px-6 mb-8 text-center">
+          <Reveal>
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#FF4A1F]/10 border border-[#FF4A1F]/20 text-[#FF4A1F] text-sm font-bold mb-6">
+              <Users size={16} /> Join {totalCount > 0 ? `${totalCount}+` : 'our'} successful students
+            </div>
+            <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight text-white mb-10">Don't just take our word for it.</h2>
+          </Reveal>
         </div>
 
         <Reveal>
-           {loadingTesti ? (
+           {loadingInitial ? (
              <div className="flex justify-center items-center h-40">
                 <Loader2 className="w-8 h-8 text-[#FF4A1F] animate-spin" />
              </div>
-           ) : (
-             <InfiniteSlider items={testimonials} />
-           )}
+           ) : sliderTestimonials.length > 0 ? (
+             <>
+               <InfiniteSlider items={sliderTestimonials} />
+               <div className="flex justify-center mt-10">
+                 <button 
+                   onClick={openModal}
+                   className="bg-neutral-900 text-white border border-neutral-800 px-6 py-3 rounded-xl font-bold flex items-center hover:bg-neutral-800 hover:border-neutral-700 transition-all active:scale-95"
+                 >
+                   Read all {totalCount} reviews <ArrowRight className="ml-2 w-4 h-4" />
+                 </button>
+               </div>
+             </>
+           ) : null}
         </Reveal>
       </section>
 
@@ -380,10 +416,7 @@ export default function LandingPage() {
             
             <div className="relative z-10">
               <h2 className="text-4xl md:text-6xl font-extrabold tracking-tight mb-6 text-white leading-tight">Your dream company is hiring.<br/>Are you ready?</h2>
-              <p className="text-white/90 text-lg md:text-xl mb-12 max-w-2xl mx-auto font-medium">
-                Join 10,000+ students who stopped wishing and started preparing. Access the premium workspace today.
-              </p>
-              <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
+              <div className="flex flex-col sm:flex-row justify-center items-center gap-4 mt-12">
                 <Link to="/signup" className="w-full sm:w-auto bg-neutral-950 text-white px-10 py-5 rounded-2xl font-bold hover:scale-105 transition-transform shadow-xl flex items-center justify-center border border-neutral-800 text-lg">
                   Launch Workspace <ArrowRight className="ml-2 w-5 h-5" />
                 </Link>
@@ -392,6 +425,89 @@ export default function LandingPage() {
           </div>
         </Reveal>
       </section>
+
+      {/* =========================================
+          MODAL: VIEW ALL TESTIMONIALS
+          ========================================= */}
+      <AnimatePresence>
+        {isModalOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6"
+          >
+            {/* Backdrop */}
+            <div className="absolute inset-0 bg-neutral-950/80 backdrop-blur-md" onClick={closeModal}></div>
+            
+            {/* Modal Content */}
+            <motion.div 
+              initial={{ y: 50, scale: 0.95 }}
+              animate={{ y: 0, scale: 1 }}
+              exit={{ y: 50, scale: 0.95 }}
+              className="relative w-full max-w-4xl bg-neutral-900 border border-neutral-800 rounded-3xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-neutral-800 bg-neutral-900/50">
+                <div>
+                  <h3 className="text-2xl font-extrabold text-white">Student Stories</h3>
+                  <p className="text-sm text-neutral-400">Join {totalCount}+ students who prepared with Placium.</p>
+                </div>
+                <button onClick={closeModal} className="p-2 bg-neutral-800 hover:bg-neutral-700 rounded-full text-neutral-300 transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Scrollable Grid */}
+              <div className="p-6 overflow-y-auto flex-grow custom-scrollbar">
+                <div className="grid md:grid-cols-2 gap-6">
+                  {modalData.map((testi, idx) => (
+                    <div key={idx} className="bg-neutral-950 border border-neutral-800 p-6 rounded-2xl flex flex-col hover:border-[#FF4A1F]/50 transition-colors">
+                      <div className="flex gap-1 mb-4">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star key={star} className="w-3.5 h-3.5 fill-[#FF4A1F] text-[#FF4A1F]" />
+                        ))}
+                      </div>
+                      <p className="text-neutral-300 mb-6 text-sm leading-relaxed flex-grow">"{testi.quote}"</p>
+                      <div className="flex items-center gap-3">
+                        {testi.avatar_url && testi.avatar_url !== 'null' ? (
+                          <img src={testi.avatar_url} alt={testi.name} className="w-10 h-10 rounded-full object-cover border border-neutral-800" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-neutral-800 flex items-center justify-center font-bold text-[#FF4A1F] border border-neutral-700">
+                            {testi.name ? testi.name.charAt(0) : 'P'}
+                          </div>
+                        )}
+                        <div>
+                          <h4 className="text-white font-bold text-sm">{testi.name}</h4>
+                          <p className="text-[10px] font-medium text-[#FF4A1F] uppercase">{testi.role}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Load More Button */}
+                {hasMore && (
+                  <div className="mt-8 flex justify-center pb-4">
+                    <button 
+                      onClick={() => {
+                        const nextPage = page + 1;
+                        setPage(nextPage);
+                        fetchModalBatch(nextPage);
+                      }}
+                      disabled={loadingMore}
+                      className="bg-neutral-800 text-white px-6 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-neutral-700 transition-colors disabled:opacity-50"
+                    >
+                      {loadingMore && <Loader2 className="w-4 h-4 animate-spin" />}
+                      {loadingMore ? 'Loading...' : 'Load More Reviews'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

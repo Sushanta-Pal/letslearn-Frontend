@@ -3,6 +3,9 @@ import { motion, useMotionValue, useTransform } from 'framer-motion';
 import { CheckCircle2, Trophy, Code, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
+// Correctly import the image using Vite's module resolution
+import founderImage from '../../assets/sushantafounder.jpeg'; // Ensure the extension (.jpeg or .jpg) matches the actual file exactly
+
 const Reveal = ({ children, delay = 0 }) => (
   <motion.div
     initial={{ opacity: 0, y: 30 }}
@@ -102,10 +105,10 @@ export default function AboutFounder() {
               <div className="absolute inset-0 bg-gradient-to-tr from-[#FF4A1F]/30 to-transparent rounded-[3rem] blur-3xl transform rotate-6 group-hover:rotate-12 transition-all duration-700"></div>
               
               <Hover3DImage>
-                {/* PHOTO ADDED HERE */}
+                {/* PHOTO PROPERLY BOUND HERE */}
                 <div className="w-32 h-32 md:w-40 md:h-40 rounded-full mb-8 border-4 border-neutral-950 shadow-[0_0_30px_rgba(255,74,31,0.3)] overflow-hidden">
                   <img 
-                    src="https://images.unsplash.com/photo-1556157382-97eda2d62296?auto=format&fit=crop&w=400&q=80" 
+                    src={founderImage} 
                     alt="Sushanta Pal - Founder of Placium" 
                     className="w-full h-full object-cover"
                   />

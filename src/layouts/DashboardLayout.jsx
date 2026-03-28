@@ -110,9 +110,9 @@ export default function DashboardLayout() {
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 group shrink-0">
             <div className="w-8 h-8 rounded-lg bg-[#FF4A1F] flex items-center justify-center font-bold text-white text-sm group-hover:rotate-12 transition-transform">
-              FB
+              PL
             </div>
-            <span className="font-bold tracking-tight hidden sm:block">Fox Bird</span>
+            <span className="font-bold tracking-tight hidden sm:block">Placium</span>
             {isTeacher && (
                 <span className="hidden sm:block text-[10px] bg-white/10 px-2 py-0.5 rounded text-gray-400 border border-white/5 uppercase tracking-wide">
                     Instructor

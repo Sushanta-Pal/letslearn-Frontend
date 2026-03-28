@@ -48,7 +48,7 @@ export default function Testimonial({ cardsData: incoming }) {
           onError={(e) => {
             e.currentTarget.onerror = null;
             e.currentTarget.src =
-              "https://placehold.co/200x200/111/ff4a1f?text=FB";
+              "https://placehold.co/200x200/111/ff4a1f?text=PL";
           }}
         />
         <div className="min-w-0">
@@ -134,7 +134,7 @@ export default function Testimonial({ cardsData: incoming }) {
             What learners say
           </h3>
           <p className="mt-2 text-gray-400 max-w-xl">
-            Real feedback from people who used Fox Bird to level up their
+            Real feedback from people who used Placium to level up their
             skills.
           </p>
         </div>

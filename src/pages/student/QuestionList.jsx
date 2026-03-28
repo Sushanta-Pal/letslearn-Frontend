@@ -119,7 +119,7 @@ export default function QuestionList() {
             },
             body: JSON.stringify({
                 name: 'foxbird-practice-arena',
-                description: 'My Data Structures & Algorithms Solutions powered by Fox Bird',
+                description: 'My Data Structures & Algorithms Solutions powered by Placium',
                 private: false,
                 auto_init: true
             })

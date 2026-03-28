@@ -33,7 +33,7 @@ const Loader = () => {
     <div
       className="min-h-screen bg-[#0A0A0A] text-white antialiased"
       aria-busy="true"
-      aria-label="Loading Fox Bird"
+      aria-label="Loading Placium"
     >
       {/* NAVBAR SKELETON */}
       <header className="sticky top-0 z-40 backdrop-blur-sm bg-black/30">

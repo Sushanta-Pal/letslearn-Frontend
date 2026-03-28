@@ -61,8 +61,8 @@ export default function LoginPage() {
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 relative z-10">
         <div className="max-w-md w-full">
           <Link to="/" className="flex items-center gap-2 mb-10 text-gray-400 hover:text-white transition">
-            <div className="w-8 h-8 rounded-full bg-[#FF4A1F] flex items-center justify-center font-bold text-black text-sm">FB</div>
-            <span className="font-semibold">Fox Bird</span>
+            <div className="w-8 h-8 rounded-full bg-[#FF4A1F] flex items-center justify-center font-bold text-black text-sm">PL</div>
+            <span className="font-semibold">Placium</span>
           </Link>
 
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>

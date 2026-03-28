@@ -1,7 +1,7 @@
 import React from "react";
 
 /**
- * FeatureSection — Fox Bird themed features area
+ * FeatureSection — Placium themed features area
  * - Dark theme, orange accent, subtle microinteractions
  * - Accessible (semantic elements + focus states)
  *

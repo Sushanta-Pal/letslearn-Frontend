@@ -7,13 +7,13 @@
 >
   <defs>
     <!-- Background pill -->
-    <linearGradient id="fb-bg" x1="12" y1="12" x2="60" y2="60" gradientUnits="userSpaceOnUse">
+    <linearGradient id="PL-bg" x1="12" y1="12" x2="60" y2="60" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#101010" />
       <stop offset="1" stop-color="#050505" />
     </linearGradient>
 
     <!-- Accent -->
-    <linearGradient id="fb-accent" x1="32" y1="18" x2="52" y2="46" gradientUnits="userSpaceOnUse">
+    <linearGradient id="PL-accent" x1="32" y1="18" x2="52" y2="46" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#FF7A3C" />
       <stop offset="1" stop-color="#FF3B12" />
     </linearGradient>
@@ -26,7 +26,7 @@
     width="52"
     height="52"
     rx="16"
-    fill="url(#fb-bg)"
+    fill="url(#PL-bg)"
     stroke="#292929"
     stroke-width="1.2"
   />
@@ -55,7 +55,7 @@
   <!-- Wing -->
   <path
     d="M30 44L40 26L46 32L36 46C34.5 48.1 31.7 47.9 30.4 45.7L30 45Z"
-    fill="url(#fb-accent)"
+    fill="url(#PL-accent)"
   />
 
   <!-- Head / beak -->
