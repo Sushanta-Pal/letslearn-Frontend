@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Check, X, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 
 const Reveal = ({ children, delay = 0 }) => (
   <motion.div
@@ -74,6 +75,12 @@ export default function PricingPage() {
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-50 pt-32 pb-20 px-6 relative overflow-hidden">
       
+      <Helmet>
+        <title>Pricing | Placium</title>
+        <meta name="description" content="Affordable and effective placement preparation plans. Choose from Free, Pro, and Premium to crack top MNCs like Infosys, TCS, and Wipro." />
+        <meta name="keywords" content="placement preparation pricing, AI mock interview cost, placium pro, IT placement training fees" />
+      </Helmet>
+
       {/* Background Ambience */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-screen-xl h-full pointer-events-none -z-10 opacity-20">
         <div className="absolute top-[10%] left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-[#FF4A1F] rounded-full mix-blend-screen filter blur-[150px] animate-pulse"></div>
