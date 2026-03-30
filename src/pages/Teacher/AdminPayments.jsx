@@ -19,20 +19,50 @@ const AdminPayments = () => {
     }
   };
 
-  const approvePayment = async (paymentId, userId) => {
+ const approvePayment = async (paymentId, userId) => {
     const confirmApprove = window.confirm("Are you sure you want to approve this payment and upgrade the user?");
     if (!confirmApprove) return;
 
-    // 1. Update payment status
-    await supabase.from('payments').update({ status: 'approved' }).eq('id', paymentId);
-    
-    // 2. Make user premium in the profiles table
-    await supabase.from('profiles').update({ is_premium: true }).eq('id', userId);
-    
-    fetchPayments(); 
-    alert("User upgraded to Premium successfully!");
-  };
+    try {
+      // 1. Update payment status (Notice the .select().single() added)
+      const { error: paymentError } = await supabase
+        .from('payments')
+        .update({ status: 'approved' })
+        .eq('id', paymentId)
+        .select() 
+        .single();
+      if (paymentError) throw new Error("Payment Update Failed: " + paymentError.message);
+      
+      // 2. Make user premium in the profiles table
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ is_premium: true })
+        .eq('id', userId)
+        .select()
+        .single();
+      if (profileError) throw new Error("Profile Update Failed: " + profileError.message);
 
+      // 3. SEND IN-APP NOTIFICATION TO THE STUDENT
+      const { error: notifError } = await supabase
+        .from('notifications')
+        .insert([{
+          user_id: userId,
+          title: 'Welcome to Placium Premium! 🎉',
+          message: 'Your payment has been verified. You now have unlimited access to mock interviews, premium DSA problems, and priority reviews.',
+          type: 'success',
+          is_read: false
+        }]);
+      if (notifError) console.error("Notification failed to send:", notifError);
+
+      // Refresh the admin view
+      fetchPayments(); 
+      alert("User upgraded to Premium and notified successfully!");
+
+    } catch (error) {
+      console.error("Error approving payment:", error);
+      alert("Something went wrong: " + error.message);
+    }
+  };
   return (
     <div className="p-8">
       <h2 className="text-2xl font-bold mb-6">Pending Pro Upgrades</h2>

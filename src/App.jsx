@@ -33,6 +33,7 @@ import AddQuestionPage from "./pages/Teacher/AddQuestionPage";
 import ManageCourses from "./pages/Teacher/ManageCourses";
 import ReviewDashboard from './pages/Teacher/ReviewDashboard';
 import AssignmentManager from "./pages/Teacher/AssignmentManager";
+import PracticeSetBuilder from "./pages/Teacher/PracticeSetBuilder";
 
 // --- Freemium & Admin Features ---
 import CheckoutPage from './pages/student/CheckoutPage';
@@ -92,6 +93,7 @@ function AnimatedRoutes() {
            <Route path="teacher/manage-courses" element={<ManageCourses />} />
            <Route path="teacher/assignments" element={<motion.div {...pageMotionProps}><AssignmentManager /></motion.div>} />
            <Route path="teacher/reviews" element={<ReviewDashboard />} />
+           <Route path="teacher/practice-builder" element={<motion.div {...pageMotionProps}><PracticeSetBuilder /></motion.div>} />
            
            {/* Admin Payments Route */}
            <Route path="admin/payments" element={<motion.div {...pageMotionProps}><AdminPayments /></motion.div>} />

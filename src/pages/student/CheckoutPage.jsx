@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-// import { supabase } from '../../supabaseClient'; 
-// import { useNavigate } from 'react-router-dom';
+import { supabase } from '../../supabaseClient'; 
+import { useNavigate } from 'react-router-dom';
 import { ShieldCheck, Clock, CreditCard, ChevronLeft, CheckCircle2, Sparkles } from 'lucide-react';
 
 const CheckoutPage = () => {
@@ -8,19 +8,63 @@ const CheckoutPage = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState(''); 
-  // const navigate = useNavigate();
+  
+  // NEW: State to track selected plan
+  const [plan, setPlan] = useState('monthly'); // 'monthly' | 'yearly'
+  
+  const navigate = useNavigate();
+
+  // Dynamically calculate amount based on selected plan
+  const amount = plan === 'monthly' ? 99 : 999;
 
   const handlePaymentSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setMessage('');
 
-    // Simulated submission
-    setTimeout(() => {
-        setMessageType('success');
-        setMessage("Payment submitted successfully! Admin will verify and activate your Premium Access within 2 hours.");
-        setLoading(false);
-    }, 1500);
+    try {
+      // 1. Verify the user is logged in
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        throw new Error("You must be logged in to submit a payment.");
+      }
+
+      // 2. Insert the payment record into Supabase (WITH .select() TO FIX SILENT FAILURE)
+      const { data, error: insertError } = await supabase
+        .from('payments')
+        .insert([{ 
+            user_id: user.id, 
+            utr_number: utr, 
+            amount: amount, // Dynamic amount based on selection
+            status: 'pending' 
+        }])
+        .select(); // <-- This forces Supabase to return the row, exposing RLS blocks
+
+      if (insertError) {
+        // Handle duplicate UTRs cleanly
+        if (insertError.code === '23505') {
+            throw new Error("This UTR number has already been submitted.");
+        }
+        throw new Error(insertError.message);
+      }
+
+      // Catch the silent RLS failure!
+      if (!data || data.length === 0) {
+        throw new Error("Database blocked the payment. Please ensure you have RLS Insert policies enabled.");
+      }
+
+      // 3. Success state
+      setMessageType('success');
+      setMessage(`Payment of ₹${amount} submitted successfully! Admin will verify and activate your Premium Access within 2 hours.`);
+      setUtr(''); // Clear the input field
+
+    } catch (err) {
+      setMessageType('error');
+      setMessage(err.message || "Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -31,14 +75,44 @@ const CheckoutPage = () => {
         <div className="p-8 md:p-10 bg-[#151515] flex flex-col justify-between">
           <div>
             <button 
-              // onClick={() => navigate(-1)} 
+              onClick={() => navigate(-1)} 
               className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors mb-8 text-sm font-medium w-fit"
             >
               <ChevronLeft size={16} /> Back to Dashboard
             </button>
             
             <h2 className="text-3xl font-extrabold text-white mb-2">Order Summary</h2>
-            <p className="text-gray-400 text-sm mb-8">Review your premium benefits before proceeding to payment.</p>
+            <p className="text-gray-400 text-sm mb-6">Choose your premium plan and review your benefits.</p>
+
+            {/* NEW: Plan Selection Toggle */}
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div 
+                onClick={() => setPlan('monthly')}
+                className={`cursor-pointer p-4 rounded-xl border transition-all ${
+                  plan === 'monthly' 
+                    ? 'bg-indigo-500/10 border-indigo-500 text-white shadow-[0_0_15px_rgba(79,70,229,0.15)]' 
+                    : 'bg-[#1a1a1a] border-gray-800 text-gray-400 hover:border-gray-600'
+                }`}
+              >
+                <p className="text-sm font-medium mb-1">1 Month</p>
+                <p className="text-2xl font-bold">₹99</p>
+              </div>
+              
+              <div 
+                onClick={() => setPlan('yearly')}
+                className={`cursor-pointer p-4 rounded-xl border transition-all relative ${
+                  plan === 'yearly' 
+                    ? 'bg-indigo-500/10 border-indigo-500 text-white shadow-[0_0_15px_rgba(79,70,229,0.15)]' 
+                    : 'bg-[#1a1a1a] border-gray-800 text-gray-400 hover:border-gray-600'
+                }`}
+              >
+                <div className="absolute -top-3 right-2 bg-gradient-to-r from-orange-500 to-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                  SAVE 15%
+                </div>
+                <p className="text-sm font-medium mb-1">1 Year</p>
+                <p className="text-2xl font-bold">₹999</p>
+              </div>
+            </div>
 
             <div className="bg-[#1a1a1a] border border-indigo-500/30 rounded-2xl p-6 mb-6 relative overflow-hidden">
               {/* Premium Glow Effect */}
@@ -75,7 +149,7 @@ const CheckoutPage = () => {
               <ul className="space-y-3 border-t border-gray-800 pt-6 relative z-10">
                 <li className="flex justify-between text-sm">
                   <span className="text-gray-400">Subtotal</span>
-                  <span className="text-white font-medium">₹99.00</span>
+                  <span className="text-white font-medium">₹{amount}.00</span>
                 </li>
                 <li className="flex justify-between text-sm">
                   <span className="text-gray-400">Platform Fee</span>
@@ -83,19 +157,19 @@ const CheckoutPage = () => {
                 </li>
                 <li className="flex justify-between text-lg font-bold border-t border-gray-800 pt-4 mt-4">
                   <span className="text-white">Total Amount</span>
-                  <span className="text-indigo-400">₹99.00</span>
+                  <span className="text-indigo-400">₹{amount}.00</span>
                 </li>
               </ul>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 text-sm text-gray-500 bg-[#1a1a1a] p-4 rounded-xl border border-gray-800">
+          <div className="flex items-center gap-3 text-sm text-gray-500 bg-[#1a1a1a] p-4 rounded-xl border border-gray-800 mt-4 md:mt-0">
             <ShieldCheck className="text-green-500 shrink-0" size={20} />
             <p>100% Secure Payment. Your transaction is encrypted and safe.</p>
           </div>
         </div>
 
-        {/* Right Side: Payment Details (Unchanged from previous sleek design) */}
+        {/* Right Side: Payment Details */}
         <div className="p-8 md:p-10 flex flex-col justify-center">
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
@@ -147,7 +221,7 @@ const CheckoutPage = () => {
                 }
               `}
             >
-              {loading ? 'Verifying Payment...' : 'Confirm Payment'}
+              {loading ? 'Verifying Payment...' : `Confirm Payment (₹${amount})`}
             </button>
           </form>
 
