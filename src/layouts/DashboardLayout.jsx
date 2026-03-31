@@ -9,11 +9,12 @@ export default function DashboardLayout() {
   const [role, setRole] = useState(null);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   
-  // --- NOTIFICATIONS & STREAK STATE ---
+  // --- NOTIFICATIONS, STREAK & PREMIUM STATE ---
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [streak, setStreak] = useState(0);
+  const [isPremium, setIsPremium] = useState(false); // 🟢 NEW: State to track if user is Pro
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -27,6 +28,17 @@ export default function DashboardLayout() {
       }
       setUser(user);
       
+      // 🟢 NEW: Fetch premium status from the profiles table
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('is_premium')
+        .eq('id', user.id)
+        .single();
+        
+      if (!profileError && profileData) {
+        setIsPremium(profileData.is_premium || false);
+      }
+
       const rawRole = user.app_metadata?.user_role || user.user_metadata?.user_role || 'student';
       setRole(rawRole);
 
@@ -120,6 +132,12 @@ export default function DashboardLayout() {
                     Instructor
                 </span>
             )}
+            {/* 🟢 NEW: Pro Badge next to logo for premium users */}
+            {isPremium && !isTeacher && (
+                <span className="hidden sm:flex items-center gap-1 text-[10px] bg-yellow-500/10 px-2 py-0.5 rounded text-yellow-500 border border-yellow-500/20 uppercase tracking-wide font-bold ml-1">
+                    <Star size={10} className="fill-yellow-500" /> Pro
+                </span>
+            )}
           </Link>
 
           {/* Desktop Links */}
@@ -145,8 +163,8 @@ export default function DashboardLayout() {
           {/* Right Side Actions */}
           <div className="flex items-center gap-3 md:gap-4 shrink-0">
             
-            {/* UPGRADE TO PRO CTA (Fixed Path) */}
-            {!isTeacher && (
+            {/* 🟢 CHANGED: UPGRADE TO PRO CTA (Now checks !isPremium) */}
+            {(!isTeacher && !isPremium) && (
               <Link
                 to="/dashboard/checkout" 
                 className="hidden sm:flex items-center gap-1.5 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white px-3 py-1.5 rounded-full text-xs font-bold hover:shadow-lg hover:shadow-yellow-500/20 transition-all border border-yellow-400/50"
@@ -234,7 +252,10 @@ export default function DashboardLayout() {
                     <div className="px-4 py-2 border-b border-white/5">
                       <p className="text-xs text-gray-500">Signed in as</p>
                       <p className="text-sm font-bold text-white truncate">{user.email}</p>
-                      <p className="text-[10px] text-[#FF4A1F] uppercase mt-1">{role}</p>
+                      {/* 🟢 NEW: Added Pro badge to role display inside dropdown */}
+                      <p className="text-[10px] text-[#FF4A1F] uppercase mt-1">
+                        {role} {isPremium && '· PRO'}
+                      </p>
                     </div>
                     
                     {/* Mobile Links */}
@@ -246,8 +267,8 @@ export default function DashboardLayout() {
                         ))}
                     </div>
 
-                    {/* Mobile Upgrade Pro Button (Fixed Path) */}
-                    {!isTeacher && (
+                    {/* 🟢 CHANGED: Mobile Upgrade Pro Button (Now checks !isPremium) */}
+                    {(!isTeacher && !isPremium) && (
                       <div className="sm:hidden border-b border-white/5 pb-2 mb-2">
                         <Link to="/dashboard/checkout" onClick={() => setIsProfileDropdownOpen(false)} className="flex items-center gap-2 px-4 py-2 text-sm text-yellow-500 hover:bg-white/5 hover:text-yellow-400 font-bold">
                           <Star size={16} className="fill-yellow-500" /> Upgrade Pro

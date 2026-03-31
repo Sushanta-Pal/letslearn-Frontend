@@ -3,6 +3,9 @@ import { BrowserRouter, Routes, Route, useLocation, useParams, Navigate } from "
 import { AnimatePresence, motion } from "framer-motion";
 import { supabase } from './supabaseClient';
 
+// --- NEW: Ads Phase 1 ---
+import PopupAd from "./components/PopupAd"; 
+
 // --- NEW: Public Marketing Pages ---
 import PublicLayout from "./layouts/PublicLayout";
 import LandingPage from "./pages/public/LandingPage";
@@ -157,9 +160,12 @@ function MockInterviewSessionWrapper() {
     return <MockInterviewView user={user} initialSessionId={sessionId} />;
 }
 
+// --- MAIN APP EXPORT ---
 export default function App() {
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      {/* 🟢 Injected PopupAd here so it covers everything globally 🟢 */}
+      <PopupAd />
       <AnimatedRoutes />
     </BrowserRouter>
   );
