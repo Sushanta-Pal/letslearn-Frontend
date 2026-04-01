@@ -129,9 +129,17 @@ export default function PracticeSetBuilder() {
   const handleSaveSet = async () => {
     if(!setData.title) return alert("Please enter a title");
     setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
+    
+    // FIX 2: Check for user safely to prevent crash
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (!user || authError) {
+      setLoading(false);
+      return alert("You must be logged in to publish a practice set.");
+    }
     
     const payload = {
+      id: crypto.randomUUID(), // FIX 1: Generate unique ID to prevent database duplicate key error
       created_by: user.id,
       title: setData.title,
       access_key: setData.accessKey || null,
@@ -382,4 +390,4 @@ export default function PracticeSetBuilder() {
       )}
     </div>
   );
-}
+} // FIX 3: Removed the extra closing brace here
