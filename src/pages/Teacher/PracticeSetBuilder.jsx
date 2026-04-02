@@ -139,7 +139,7 @@ export default function PracticeSetBuilder() {
     }
     
     const payload = {
-      id: crypto.randomUUID(), // FIX 1: Generate unique ID to prevent database duplicate key error
+      // id: crypto.randomUUID(), // FIX 1: Generate unique ID to prevent database duplicate key error
       created_by: user.id,
       title: setData.title,
       access_key: setData.accessKey || null,
