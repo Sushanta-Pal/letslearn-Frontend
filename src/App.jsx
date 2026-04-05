@@ -29,6 +29,7 @@ import MockInterviewView from "./pages/student/MockInterviewView";
 import CourseViewer from "./pages/student/CourseViewer";
 import SolveProblemPage from "./pages/student/SolveProblemPage";
 import StudentAssignmentView from "./pages/student/StudentAssignmentView";
+import AIInterviewContainer from "./pages/student/AIInterviewContainer";
 
 // --- Teacher Views ---
 import CreateInternship from "./pages/Teacher/CreateInternship";
@@ -85,6 +86,7 @@ function AnimatedRoutes() {
            <Route path="assignments" element={<motion.div {...pageMotionProps}><StudentAssignmentViewWrapper /></motion.div>} />
            <Route path="interviews" element={<motion.div {...pageMotionProps}><MockInterviewWrapper /></motion.div>} />
            <Route path="practice" element={<motion.div {...pageMotionProps}><QuestionListPage /></motion.div>} />
+           <Route path="ai-interview" element={<motion.div {...pageMotionProps}><AIInterviewWrapper /></motion.div>} />
            
            {/* Freemium & Guidance Routes */}
            <Route path="checkout" element={<motion.div {...pageMotionProps}><CheckoutPage /></motion.div>} />
@@ -118,7 +120,7 @@ function AnimatedRoutes() {
   );
 }
 
-// --- WRAPPERS (Kept exactly as you had them) ---
+// --- WRAPPERS ---
 
 function StudentAssignmentViewWrapper() {
     const [user, setUser] = useState(null);
@@ -160,11 +162,66 @@ function MockInterviewSessionWrapper() {
     return <MockInterviewView user={user} initialSessionId={sessionId} />;
 }
 
+// 🟢 NEW: Bulletproof Hybrid Authentication Wrapper
+function AIInterviewWrapper() {
+    const [user, setUser] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [isPaid, setIsPaid] = useState(false);
+
+    useEffect(() => { 
+        const verifyAccess = async () => {
+            const { data } = await supabase.auth.getUser();
+            const currentUser = data.user;
+            
+            if (currentUser) {
+                setUser(currentUser);
+                
+                // STEP 1: Check Metadata (Fastest)
+                // Assuming 'is_premium' is the flag you use. Change it if yours is different.
+                let hasPaidPlan = currentUser.user_metadata?.is_premium === true; 
+                
+                // STEP 2: Database Fallback (Safest)
+                // If metadata says false (maybe they just paid and it hasn't synced), query the DB to be 100% sure.
+                if (!hasPaidPlan) {
+                    try {
+                        const { data: profile } = await supabase
+                            .from('users') // Change 'users' to whatever table tracks your payments/roles
+                            .select('is_premium') // Change to your specific column name
+                            .eq('id', currentUser.id)
+                            .single();
+                            
+                        if (profile && profile.is_premium === true) {
+                            hasPaidPlan = true;
+                        }
+                    } catch (err) {
+                        console.error("DB Verification Error:", err);
+                    }
+                }
+
+                setIsPaid(hasPaidPlan);
+            }
+            setLoading(false);
+        };
+        
+        verifyAccess();
+    }, []);
+
+    if (loading) return <div className="p-10 text-white text-center">Loading User...</div>;
+    if (!user) return <div className="p-10 text-white text-center">Please Log In</div>;
+    
+    // Kick out free users and send them to the Checkout page
+    if (!isPaid) {
+        return <Navigate to="/dashboard/checkout" replace />; 
+    }
+    
+    return <AIInterviewContainer user={user} />;
+}
+
 // --- MAIN APP EXPORT ---
 export default function App() {
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      {/* 🟢 Injected PopupAd here so it covers everything globally 🟢 */}
+      {/* Injected PopupAd here so it covers everything globally */}
       <PopupAd />
       <AnimatedRoutes />
     </BrowserRouter>
