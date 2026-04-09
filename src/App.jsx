@@ -185,8 +185,8 @@ function AIInterviewWrapper() {
                 if (!hasPaidPlan) {
                     try {
                         const { data: profile } = await supabase
-                            .from('users') // Change 'users' to whatever table tracks your payments/roles
-                            .select('is_premium') // Change to your specific column name
+                            .from('profiles') 
+                            .select('is_premium')
                             .eq('id', currentUser.id)
                             .single();
                             
