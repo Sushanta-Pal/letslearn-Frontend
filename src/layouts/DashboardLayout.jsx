@@ -96,7 +96,7 @@ export default function DashboardLayout() {
     { name: "Practice", path: "/dashboard/practice" },
     { name: "Mock Interview", path: "/dashboard/interviews" }, 
     { name: "AI Resume Interview", path: "/dashboard/ai-interview" },
-    { name: "1-on-1 Guidance", path: "/dashboard/placement-guidance" }, // FIXED PATH
+    // { name: "1-on-1 Guidance", path: "/dashboard/placement-guidance" }, // FIXED PATH
   ];
 
   const teacherLinks = [

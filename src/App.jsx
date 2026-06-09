@@ -90,7 +90,7 @@ function AnimatedRoutes() {
            
            {/* Freemium & Guidance Routes */}
            <Route path="checkout" element={<motion.div {...pageMotionProps}><CheckoutPage /></motion.div>} />
-           <Route path="placement-guidance" element={<motion.div {...pageMotionProps}><PlacementGuidance /></motion.div>} />
+           {/* <Route path="placement-guidance" element={<motion.div {...pageMotionProps}><PlacementGuidance /></motion.div>} /> */}
            
            {/* Teacher Specific Routes */}
            <Route path="teacher/create-internship" element={<CreateInternship />} />
