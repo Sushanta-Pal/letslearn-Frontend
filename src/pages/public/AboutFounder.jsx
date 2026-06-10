@@ -185,9 +185,9 @@ export default function AboutTeam() {
       role: "Full Stack Development, AI Integration & System Architecture",
     },
     {
-      name: "Subhajit Pramanick",
+      name: "Subhojit Pramanick",
       company: "KPMG",
-      role: "Business Analysis, Documentation & Testing",
+      role: "GovTech Solutions, Full Stack Development & System Integration",
     },
     {
       name: "Sujan Khan",
